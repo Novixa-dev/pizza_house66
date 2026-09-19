@@ -1,0 +1,345 @@
+// Pizza House / Novixa Restaurant — core data model.
+// See docs/DATABASE.md for entity rationale and docs/DECISIONS.md for the
+// SQLite-for-MVP-dev / Postgres-for-production decision.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identity & Access
+// ---------------------------------------------------------------------------
+
+enum Role {
+  OWNER
+  MANAGER
+  CASHIER
+  KITCHEN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  paymentReviews    PaymentStatusHistory[] @relation("ReviewedBy")
+  orderStatusEvents OrderStatusHistory[]   @relation("ChangedBy")
+}
+
+// ---------------------------------------------------------------------------
+// Restaurant configuration
+// ---------------------------------------------------------------------------
+
+model Restaurant {
+  id                String   @id @default(cuid())
+  name              String
+  nameAr            String
+  slug              String   @unique
+  currency          String   @default("YER")
+  phone             String?
+  whatsapp          String?
+  addressAr         String?
+  addressEn         String?
+  city              String?
+  instagramUrl      String?
+  defaultPrepMinutes Int     @default(20)
+  onlineOrderingPaused Boolean @default(false)
+  pauseMessageAr    String?
+  pauseMessageEn    String?
+  slotIntervalMinutes Int    @default(15)
+  slotCapacity      Int      @default(10)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  businessHours     BusinessHour[]
+  scheduleOverrides ScheduleOverride[]
+  paymentMethods    PaymentMethodConfig[]
+}
+
+// 0 = Sunday ... 6 = Saturday
+model BusinessHour {
+  id           String   @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  dayOfWeek    Int
+  opensAt      String // "HH:mm"
+  closesAt     String // "HH:mm", may cross midnight (closesAt < opensAt)
+  closed       Boolean  @default(false)
+
+  @@unique([restaurantId, dayOfWeek])
+}
+
+model ScheduleOverride {
+  id           String   @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  date         DateTime // calendar date, time ignored
+  closed       Boolean  @default(true)
+  opensAt      String?
+  closesAt     String?
+  reason       String?
+}
+
+enum PaymentMethodType {
+  PAY_AT_PICKUP
+  BANK_TRANSFER
+  ELECTRONIC
+}
+
+model PaymentMethodConfig {
+  id           String   @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  type         PaymentMethodType
+  enabled      Boolean  @default(true)
+  instructionsAr String?
+  instructionsEn String?
+
+  @@unique([restaurantId, type])
+}
+
+// ---------------------------------------------------------------------------
+// Catalog
+// ---------------------------------------------------------------------------
+
+enum AvailabilityState {
+  AVAILABLE
+  SOLD_OUT
+  HIDDEN
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  nameAr    String
+  nameEn    String
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+
+  products Product[]
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  categoryId   String
+  category     Category @relation(fields: [categoryId], references: [id])
+  nameAr       String
+  nameEn       String
+  descriptionAr String?
+  descriptionEn String?
+  imageUrl     String?
+  basePriceMinor Int    // minor currency units (e.g. YER has no subunit in practice; treat as whole units)
+  availability AvailabilityState @default(AVAILABLE)
+  featured     Boolean  @default(false)
+  sortOrder    Int      @default(0)
+  prepMinutes  Int?     // overrides restaurant default when set
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  optionGroups ProductOptionGroup[]
+  orderItems   OrderItem[]
+}
+
+// e.g. "Size", "Crust" — required, single-select
+model ProductOptionGroup {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  nameAr     String
+  nameEn     String
+  required   Boolean  @default(false)
+  multiSelect Boolean @default(false) // true = add-ons style (0..n)
+  sortOrder  Int      @default(0)
+
+  values ProductOptionValue[]
+}
+
+model ProductOptionValue {
+  id            String   @id @default(cuid())
+  groupId       String
+  group         ProductOptionGroup @relation(fields: [groupId], references: [id])
+  nameAr        String
+  nameEn        String
+  priceDeltaMinor Int    @default(0)
+  available     Boolean  @default(true)
+  sortOrder     Int      @default(0)
+
+  orderItemOptions OrderItemOption[]
+}
+
+// ---------------------------------------------------------------------------
+// Customers
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  createdAt DateTime @default(now())
+
+  orders Order[]
+}
+
+// ---------------------------------------------------------------------------
+// Orders
+// ---------------------------------------------------------------------------
+
+enum OrderStatus {
+  PENDING
+  PAYMENT_PENDING
+  CONFIRMED
+  QUEUED
+  PREPARING
+  READY
+  COMPLETED
+  REJECTED
+  CANCELLED
+  REFUNDED
+}
+
+enum PickupMode {
+  ASAP
+  SCHEDULED
+}
+
+model Order {
+  id                String   @id @default(cuid())
+  reference         String   @unique // short human-facing code, e.g. PH-4821
+  trackingToken     String   @unique @default(cuid()) // capability token for guest tracking URL
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id])
+  guestName         String
+  guestPhone        String
+  notes             String?
+
+  pickupMode        PickupMode
+  requestedPickupAt DateTime
+  prepMinutes        Int
+  kitchenReleaseAt   DateTime // requestedPickupAt - prepMinutes
+
+  subtotalMinor      Int
+  discountMinor       Int      @default(0)
+  totalMinor           Int
+  currency             String   @default("YER")
+
+  status              OrderStatus @default(PENDING)
+  idempotencyKey       String?  @unique
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  confirmedAt          DateTime?
+  preparingAt          DateTime?
+  readyAt              DateTime?
+  completedAt          DateTime?
+  cancelledAt          DateTime?
+
+  items          OrderItem[]
+  statusHistory  OrderStatusHistory[]
+  payment        Payment?
+}
+
+model OrderItem {
+  id             String   @id @default(cuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id])
+  productId      String?
+  product        Product? @relation(fields: [productId], references: [id])
+  nameAr         String   // snapshot at purchase time
+  nameEn         String
+  unitPriceMinor Int      // snapshot, includes base price only (options priced separately)
+  quantity       Int
+  lineTotalMinor Int
+  note           String?
+
+  options OrderItemOption[]
+}
+
+model OrderItemOption {
+  id              String   @id @default(cuid())
+  orderItemId     String
+  orderItem       OrderItem @relation(fields: [orderItemId], references: [id])
+  optionValueId   String?
+  optionValue     ProductOptionValue? @relation(fields: [optionValueId], references: [id])
+  nameAr          String   // snapshot
+  nameEn          String
+  priceDeltaMinor Int
+}
+
+model OrderStatusHistory {
+  id           String   @id @default(cuid())
+  orderId      String
+  order        Order    @relation(fields: [orderId], references: [id])
+  fromStatus   OrderStatus?
+  toStatus     OrderStatus
+  changedById  String?
+  changedBy    User?    @relation("ChangedBy", fields: [changedById], references: [id])
+  reason       String?
+  createdAt    DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
+enum PaymentStatus {
+  UNPAID
+  PENDING
+  PROCESSING
+  VERIFIED
+  PAID
+  REJECTED
+  REFUNDED
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  orderId         String   @unique
+  order           Order    @relation(fields: [orderId], references: [id])
+  method          PaymentMethodType
+  status          PaymentStatus @default(UNPAID)
+  amountMinor     Int
+  currency        String   @default("YER")
+  referenceNumber String?
+  receiptPath     String?  // stored file path, never publicly exposed
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  statusHistory PaymentStatusHistory[]
+}
+
+model PaymentStatusHistory {
+  id           String   @id @default(cuid())
+  paymentId    String
+  payment      Payment  @relation(fields: [paymentId], references: [id])
+  fromStatus   PaymentStatus?
+  toStatus     PaymentStatus
+  reviewedById String?
+  reviewedBy   User?    @relation("ReviewedBy", fields: [reviewedById], references: [id])
+  reason       String?
+  createdAt    DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Audit
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  String? // JSON-encoded
+  createdAt DateTime @default(now())
+}
