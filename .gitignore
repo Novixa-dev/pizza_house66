@@ -50,3 +50,6 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /.playwright/
+
+# Screenshots captured for review — regenerate rather than version 5MB of PNGs.
+/screenshots/
