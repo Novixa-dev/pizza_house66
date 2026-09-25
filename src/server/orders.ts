@@ -1,14 +1,36 @@
+import "server-only";
+
+import { randomBytes, randomInt } from "node:crypto";
 import { prisma } from "@/lib/db";
 import type { CreateOrderInput } from "./order-schema";
-import { getRestaurant, toBusinessHourRules, toScheduleOverrideRules } from "./restaurant";
+import { decodeReceipt, normalizePhone, sanitizeFilename } from "./order-schema";
+import { getRestaurant, schedulingConfigFor, type RestaurantWithConfig } from "./restaurant";
 import {
   computeKitchenReleaseAt,
   earliestPossiblePickup,
-  isReadyForKitchenRelease,
+  generatePickupSlots,
   nextValidPickupSlot,
+  slotStartFor,
   validatePickupTime,
+  type SchedulingConfig,
 } from "@/lib/scheduling";
+import {
+  computeTotals,
+  evaluatePromotion,
+  lineUnitPrice,
+  type PricedLine,
+  type PromotionRule,
+} from "@/lib/pricing";
+import { RELEASED_SLOT_STATUSES } from "@/lib/order-state";
+import { track } from "./analytics";
+import { notifyOrderStatus } from "./notifications";
 import type { Prisma } from "@prisma/client";
+
+// Order creation is the one write path a customer can reach, so it is also
+// where the product's integrity rules concentrate: server-side pricing,
+// availability re-checks, pickup-time validation, slot capacity, and
+// idempotency. Each failure mode gets its own error type so the API layer can
+// map it to a specific, localized message instead of a generic 500.
 
 export class OrderingPausedError extends Error {
   constructor() {
@@ -18,99 +40,135 @@ export class OrderingPausedError extends Error {
 }
 
 export class InvalidPickupTimeError extends Error {
-  earliestValid: Date;
-  constructor(earliestValid: Date) {
+  readonly earliestValid: Date | null;
+  readonly reasonCode: string;
+  constructor(earliestValid: Date | null, reasonCode: string) {
     super("Requested pickup time is not valid");
     this.name = "InvalidPickupTimeError";
     this.earliestValid = earliestValid;
+    this.reasonCode = reasonCode;
   }
 }
 
 export class ProductUnavailableError extends Error {
-  constructor(productName: string) {
-    super(`${productName} is no longer available`);
+  readonly productNameAr: string;
+  readonly productNameEn: string;
+  constructor(nameAr: string, nameEn: string) {
+    super(`${nameEn} is no longer available`);
     this.name = "ProductUnavailableError";
+    this.productNameAr = nameAr;
+    this.productNameEn = nameEn;
+  }
+}
+
+export class InvalidOptionsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidOptionsError";
   }
 }
 
 export class SlotFullError extends Error {
-  suggestedAt: Date;
-  constructor(suggestedAt: Date) {
+  readonly suggestedAt: Date | null;
+  constructor(suggestedAt: Date | null) {
     super("Requested pickup slot is at capacity");
     this.name = "SlotFullError";
     this.suggestedAt = suggestedAt;
   }
 }
 
-function generateReference(): string {
-  const n = Math.floor(1000 + Math.random() * 9000);
-  return `PH-${n}`;
+export class BelowMinimumOrderError extends Error {
+  readonly minimumMinor: number;
+  constructor(minimumMinor: number) {
+    super("Order total is below the restaurant minimum");
+    this.name = "BelowMinimumOrderError";
+    this.minimumMinor = minimumMinor;
+  }
+}
+
+export class NoSlotsAvailableError extends Error {
+  constructor() {
+    super("No pickup slots are available");
+    this.name = "NoSlotsAvailableError";
+  }
 }
 
 /**
- * Creates an order with server-authoritative pricing, availability, and
- * pickup-time validation. Never trusts client-submitted prices or totals
- * (docs/PRD.md sections 43, 90). Idempotent on `idempotencyKey`: a repeated
- * call with the same key returns the original order instead of creating a
- * duplicate (docs/PRD.md section 45).
+ * Human-facing order code. Short enough to read out over the counter, and
+ * explicitly *not* a capability — knowing it grants nothing, because tracking
+ * requires `trackingToken` (docs/PRD.md §41).
  */
-export async function createOrder(input: CreateOrderInput) {
-  const existing = await prisma.order.findUnique({
-    where: { idempotencyKey: input.idempotencyKey },
-    include: { items: { include: { options: true } }, payment: true },
-  });
-  if (existing) return existing;
+function generateReference(): string {
+  return `PH-${randomInt(1000, 10000)}`;
+}
 
-  const restaurant = await getRestaurant();
-  if (restaurant.onlineOrderingPaused) {
-    throw new OrderingPausedError();
-  }
+/**
+ * Tracking token: 32 bytes of CSPRNG entropy, url-safe. Unlike a cuid, this
+ * carries no timestamp and no sequence, so one customer's link tells an
+ * attacker nothing about anyone else's.
+ */
+function generateTrackingToken(): string {
+  return randomBytes(32).toString("base64url");
+}
 
-  const now = new Date();
-  const hours = toBusinessHourRules(restaurant.businessHours);
-  const overrides = toScheduleOverrideRules(restaurant.scheduleOverrides);
+interface ResolvedPricing {
+  lines: PricedLine[];
+  maxPrepMinutes: number;
+}
 
-  const products = await prisma.product.findMany({
-    where: { id: { in: input.items.map((i) => i.productId) } },
+/**
+ * Re-reads every product and option from the database and prices the basket
+ * from those rows. The client's `optionValueIds` are only used to *select*
+ * rows, never to supply prices, and an id that doesn't belong to the product
+ * is rejected rather than silently ignored.
+ */
+async function priceBasket(
+  items: CreateOrderInput["items"],
+  defaultPrepMinutes: number,
+  tx: Prisma.TransactionClient = prisma
+): Promise<ResolvedPricing> {
+  const products = await tx.product.findMany({
+    where: { id: { in: items.map((item) => item.productId) } },
     include: { optionGroups: { include: { values: true } } },
   });
-  const productMap = new Map(products.map((p) => [p.id, p]));
+  const productMap = new Map(products.map((product) => [product.id, product]));
 
-  let subtotalMinor = 0;
-  let maxPrepMinutes = restaurant.defaultPrepMinutes;
-  const preparedItems: {
-    productId: string;
-    nameAr: string;
-    nameEn: string;
-    unitPriceMinor: number;
-    quantity: number;
-    lineTotalMinor: number;
-    note?: string;
-    options: { optionValueId: string; nameAr: string; nameEn: string; priceDeltaMinor: number }[];
-  }[] = [];
+  const lines: PricedLine[] = [];
+  let maxPrepMinutes = defaultPrepMinutes;
 
-  for (const item of input.items) {
+  for (const item of items) {
     const product = productMap.get(item.productId);
-    if (!product || product.availability !== "AVAILABLE") {
-      throw new ProductUnavailableError(product?.nameEn ?? item.productId);
+    if (!product) {
+      throw new ProductUnavailableError("صنف غير معروف", "Unknown item");
+    }
+    if (product.availability !== "AVAILABLE") {
+      throw new ProductUnavailableError(product.nameAr, product.nameEn);
     }
 
-    let unitPriceMinor = product.basePriceMinor;
-    const options: (typeof preparedItems)[number]["options"] = [];
+    const requested = new Set(item.optionValueIds);
+    const options: PricedLine["options"] = [];
 
     for (const group of product.optionGroups) {
-      const selectedInGroup = group.values.filter((v) => item.optionValueIds.includes(v.id));
-      if (group.required && selectedInGroup.length === 0) {
-        throw new Error(`Missing required option: ${group.nameEn} for ${product.nameEn}`);
+      const selected = group.values.filter((value) => requested.has(value.id));
+      for (const value of selected) requested.delete(value.id);
+
+      if (group.required && selected.length === 0) {
+        throw new InvalidOptionsError(`Missing required option "${group.nameEn}" for ${product.nameEn}`);
       }
-      if (!group.multiSelect && selectedInGroup.length > 1) {
-        throw new Error(`Only one value allowed for ${group.nameEn} on ${product.nameEn}`);
+      if (!group.multiSelect && selected.length > 1) {
+        throw new InvalidOptionsError(`Only one "${group.nameEn}" may be chosen for ${product.nameEn}`);
       }
-      for (const value of selectedInGroup) {
-        if (!value.available) throw new Error(`${value.nameEn} is no longer available`);
-        unitPriceMinor += value.priceDeltaMinor;
+      if (group.multiSelect && group.maxSelect !== null && selected.length > group.maxSelect) {
+        throw new InvalidOptionsError(`At most ${group.maxSelect} "${group.nameEn}" may be chosen`);
+      }
+      for (const value of selected) {
+        if (!value.available) {
+          throw new ProductUnavailableError(value.nameAr, value.nameEn);
+        }
         options.push({
           optionValueId: value.id,
+          groupNameAr: group.nameAr,
+          groupNameEn: group.nameEn,
           nameAr: value.nameAr,
           nameEn: value.nameEn,
           priceDeltaMinor: value.priceDeltaMinor,
@@ -118,183 +176,469 @@ export async function createOrder(input: CreateOrderInput) {
       }
     }
 
-    const lineTotalMinor = unitPriceMinor * item.quantity;
-    subtotalMinor += lineTotalMinor;
-    maxPrepMinutes = Math.max(maxPrepMinutes, product.prepMinutes ?? restaurant.defaultPrepMinutes);
+    // Anything left over referenced an option that doesn't belong to this
+    // product — a tampered request, not a valid basket.
+    if (requested.size > 0) {
+      throw new InvalidOptionsError(`Unknown option for ${product.nameEn}`);
+    }
 
-    preparedItems.push({
+    const unitPriceMinor = lineUnitPrice(product.basePriceMinor, options);
+    lines.push({
       productId: product.id,
       nameAr: product.nameAr,
       nameEn: product.nameEn,
+      basePriceMinor: product.basePriceMinor,
       unitPriceMinor,
       quantity: item.quantity,
-      lineTotalMinor,
+      lineTotalMinor: unitPriceMinor * item.quantity,
       note: item.note,
       options,
     });
+
+    maxPrepMinutes = Math.max(maxPrepMinutes, product.prepMinutes ?? defaultPrepMinutes);
   }
 
-  let requestedPickupAt: Date;
-  if (input.pickup.mode === "ASAP") {
-    requestedPickupAt = nextValidPickupSlot(
-      earliestPossiblePickup(now, maxPrepMinutes),
-      restaurant.slotIntervalMinutes,
-      hours,
-      overrides
-    );
-  } else {
-    const requested = new Date(input.pickup.requestedAt);
-    const result = validatePickupTime({
-      now,
-      requested,
-      prepMinutes: maxPrepMinutes,
-      hours,
-      overrides,
-      onlineOrderingPaused: false,
-    });
-    if (!result.valid) {
-      const suggestion = nextValidPickupSlot(
-        result.earliestValid,
-        restaurant.slotIntervalMinutes,
-        hours,
-        overrides
-      );
-      throw new InvalidPickupTimeError(suggestion);
-    }
-    requestedPickupAt = requested;
-  }
+  return { lines, maxPrepMinutes };
+}
 
-  const slotStart = new Date(requestedPickupAt);
-  const slotCount = await prisma.order.count({
-    where: {
-      requestedPickupAt: slotStart,
-      status: { notIn: ["CANCELLED", "REJECTED"] },
-    },
+async function loadPromotion(
+  code: string,
+  tx: Prisma.TransactionClient = prisma
+): Promise<PromotionRule | null> {
+  const promotion = await tx.promotion.findUnique({
+    where: { code: code.toUpperCase() },
+    include: { products: { select: { productId: true } } },
   });
-  if (slotCount >= restaurant.slotCapacity) {
-    const suggestion = nextValidPickupSlot(
-      new Date(requestedPickupAt.getTime() + restaurant.slotIntervalMinutes * 60 * 1000),
-      restaurant.slotIntervalMinutes,
-      hours,
-      overrides
-    );
-    throw new SlotFullError(suggestion);
+  if (!promotion) return null;
+  return {
+    id: promotion.id,
+    code: promotion.code,
+    discountType: promotion.discountType,
+    discountValue: promotion.discountValue,
+    minOrderMinor: promotion.minOrderMinor,
+    maxDiscountMinor: promotion.maxDiscountMinor,
+    startsAt: promotion.startsAt,
+    endsAt: promotion.endsAt,
+    active: promotion.active,
+    usageLimit: promotion.usageLimit,
+    usageCount: promotion.usageCount,
+    productIds: promotion.products.map((p) => p.productId),
+  };
+}
+
+/** Promotions with no code that are live right now — the homepage "offers" rail. */
+export async function getAutomaticPromotions(now = new Date()) {
+  return prisma.promotion.findMany({
+    where: {
+      active: true,
+      code: null,
+      OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+      AND: [{ OR: [{ endsAt: null }, { endsAt: { gte: now } }] }],
+    },
+    include: { products: { select: { productId: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export interface PromoPreview {
+  valid: boolean;
+  discountMinor: number;
+  reasonCode?: string;
+  nameAr?: string;
+  nameEn?: string;
+}
+
+/** Prices a promo code against a basket without creating anything. */
+export async function previewPromotion(
+  code: string,
+  items: CreateOrderInput["items"],
+  now = new Date()
+): Promise<PromoPreview> {
+  const restaurant = await getRestaurant();
+  const { lines } = await priceBasket(items, restaurant.defaultPrepMinutes);
+  const rule = await loadPromotion(code);
+  if (!rule) return { valid: false, discountMinor: 0, reasonCode: "NOT_FOUND" };
+
+  const promotion = await prisma.promotion.findUnique({ where: { id: rule.id } });
+  const evaluation = evaluatePromotion(rule, lines, now);
+  return {
+    valid: evaluation.applicable,
+    discountMinor: evaluation.discountMinor,
+    reasonCode: evaluation.reasonCode,
+    nameAr: promotion?.nameAr,
+    nameEn: promotion?.nameEn,
+  };
+}
+
+/** Resolves the pickup instant for either ordering mode, or throws. */
+async function resolvePickupTime(
+  input: CreateOrderInput,
+  now: Date,
+  maxPrepMinutes: number,
+  config: SchedulingConfig
+): Promise<Date> {
+  if (input.pickup.mode === "ASAP") {
+    // "As soon as possible" means the earliest slot that can actually take
+    // the order — so a full slot rolls forward rather than failing. Telling
+    // a customer "that time is full, pick another" when they never picked a
+    // time is nonsense; only the SCHEDULED path can meaningfully say that.
+    const [firstOpen] = await getAvailablePickupSlots(maxPrepMinutes, now);
+    if (!firstOpen) throw new NoSlotsAvailableError();
+    return firstOpen.at;
   }
 
+  const requested = new Date(input.pickup.requestedAt);
+  if (Number.isNaN(requested.getTime())) {
+    throw new InvalidPickupTimeError(null, "IN_PAST");
+  }
+
+  const result = validatePickupTime({
+    now,
+    requested,
+    prepMinutes: maxPrepMinutes,
+    config,
+    onlineOrderingPaused: false, // already checked by the caller
+  });
+  if (!result.valid) {
+    const suggestion = nextValidPickupSlot(result.earliestPossible, config);
+    throw new InvalidPickupTimeError(suggestion, result.reasonCode ?? "CLOSED");
+  }
+  return requested;
+}
+
+export type CreatedOrder = Prisma.OrderGetPayload<{
+  include: { items: { include: { options: true } }; payment: true };
+}>;
+
+/**
+ * Creates an order.
+ *
+ * Idempotent on `idempotencyKey`: a repeated submission returns the original
+ * order rather than creating a second one, both via an up-front lookup and
+ * via the unique constraint, so two genuinely concurrent requests still
+ * produce exactly one order (docs/PRD.md §45, §92.I).
+ */
+export async function createOrder(input: CreateOrderInput): Promise<CreatedOrder> {
+  const existing = await findOrderByIdempotencyKey(input.idempotencyKey);
+  if (existing) return existing;
+
+  const restaurant = await getRestaurant();
+  if (restaurant.onlineOrderingPaused) throw new OrderingPausedError();
+
+  assertPaymentMethodEnabled(restaurant, input.payment.method);
+
+  const now = new Date();
+  const config = schedulingConfigFor(restaurant);
+
+  const { lines, maxPrepMinutes } = await priceBasket(input.items, restaurant.defaultPrepMinutes);
+
+  let discountMinor = 0;
+  let promotionId: string | null = null;
+  if (input.promoCode) {
+    const rule = await loadPromotion(input.promoCode);
+    if (rule) {
+      const evaluation = evaluatePromotion(rule, lines, now);
+      if (evaluation.applicable) {
+        discountMinor = evaluation.discountMinor;
+        promotionId = rule.id;
+      }
+    }
+    // An invalid code doesn't fail the order — the customer just doesn't get
+    // the discount, and the UI has already told them so at preview time.
+  }
+
+  const totals = computeTotals(lines, discountMinor);
+  if (totals.totalMinor < restaurant.minOrderMinor) {
+    throw new BelowMinimumOrderError(restaurant.minOrderMinor);
+  }
+
+  const requestedPickupAt = await resolvePickupTime(input, now, maxPrepMinutes, config);
+  const slotStartAt = slotStartFor(requestedPickupAt, restaurant.slotIntervalMinutes, restaurant.timezone);
   const kitchenReleaseAt = computeKitchenReleaseAt(requestedPickupAt, maxPrepMinutes);
+
+  // Bank transfers wait for a human to approve the receipt; everything else
+  // is confirmed on arrival (docs/PRD.md §19, §21).
   const initialStatus = input.payment.method === "BANK_TRANSFER" ? "PAYMENT_PENDING" : "CONFIRMED";
 
-  const order = await prisma.$transaction(async (tx) => {
-    let customer = await tx.customer.findUnique({ where: { phone: input.customer.phone } });
-    if (!customer) {
-      customer = await tx.customer.create({
-        data: { name: input.customer.name, phone: input.customer.phone },
-      });
-    }
+  const receipt =
+    input.payment.method === "BANK_TRANSFER" && input.payment.receipt
+      ? {
+          ...decodeReceipt(input.payment.receipt.contentType, input.payment.receipt.dataBase64),
+          originalName: sanitizeFilename(input.payment.receipt.originalName),
+        }
+      : null;
 
-    let reference = generateReference();
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const clash = await tx.order.findUnique({ where: { reference } });
-      if (!clash) break;
-      reference = generateReference();
-    }
+  const phone = normalizePhone(input.customer.phone);
+
+  const order = await prisma.$transaction(async (tx) => {
+    await assertSlotHasCapacity(tx, slotStartAt, restaurant, config);
+
+    const customer = await tx.customer.upsert({
+      where: { phone },
+      create: { name: input.customer.name, phone },
+      update: { name: input.customer.name },
+    });
 
     const created = await tx.order.create({
       data: {
-        reference,
+        reference: await allocateReference(tx),
+        trackingToken: generateTrackingToken(),
         customerId: customer.id,
         guestName: input.customer.name,
-        guestPhone: input.customer.phone,
+        guestPhone: phone,
         notes: input.notes,
         pickupMode: input.pickup.mode,
         requestedPickupAt,
+        slotStartAt,
         prepMinutes: maxPrepMinutes,
         kitchenReleaseAt,
-        subtotalMinor,
-        discountMinor: 0,
-        totalMinor: subtotalMinor,
+        subtotalMinor: totals.subtotalMinor,
+        discountMinor: totals.discountMinor,
+        totalMinor: totals.totalMinor,
         currency: restaurant.currency,
+        promotionId,
+        promoCode: promotionId ? input.promoCode?.toUpperCase() : null,
         status: initialStatus,
+        confirmedAt: initialStatus === "CONFIRMED" ? now : null,
         idempotencyKey: input.idempotencyKey,
         items: {
-          create: preparedItems.map((item) => ({
-            productId: item.productId,
-            nameAr: item.nameAr,
-            nameEn: item.nameEn,
-            unitPriceMinor: item.unitPriceMinor,
-            quantity: item.quantity,
-            lineTotalMinor: item.lineTotalMinor,
-            note: item.note,
+          create: lines.map((line) => ({
+            productId: line.productId,
+            nameAr: line.nameAr,
+            nameEn: line.nameEn,
+            basePriceMinor: line.basePriceMinor,
+            unitPriceMinor: line.unitPriceMinor,
+            quantity: line.quantity,
+            lineTotalMinor: line.lineTotalMinor,
+            note: line.note,
             options: {
-              create: item.options.map((o) => ({
-                optionValueId: o.optionValueId,
-                nameAr: o.nameAr,
-                nameEn: o.nameEn,
-                priceDeltaMinor: o.priceDeltaMinor,
+              create: line.options.map((option) => ({
+                optionValueId: option.optionValueId,
+                groupNameAr: option.groupNameAr,
+                groupNameEn: option.groupNameEn,
+                nameAr: option.nameAr,
+                nameEn: option.nameEn,
+                priceDeltaMinor: option.priceDeltaMinor,
               })),
             },
           })),
         },
         statusHistory: {
           create: [
-            { toStatus: "PENDING" as const },
-            { toStatus: initialStatus, fromStatus: "PENDING" as const },
+            { toStatus: "PENDING" },
+            { fromStatus: "PENDING", toStatus: initialStatus },
           ],
         },
         payment: {
           create: {
             method: input.payment.method,
             status: input.payment.method === "BANK_TRANSFER" ? "PENDING" : "UNPAID",
-            amountMinor: subtotalMinor,
+            amountMinor: totals.totalMinor,
             currency: restaurant.currency,
             referenceNumber:
               input.payment.method === "BANK_TRANSFER" ? input.payment.referenceNumber : null,
+            ...(receipt
+              ? {
+                  receipt: {
+                    create: {
+                      contentType: receipt.contentType,
+                      byteSize: receipt.buffer.byteLength,
+                      data: new Uint8Array(receipt.buffer),
+                      originalName: receipt.originalName,
+                    },
+                  },
+                }
+              : {}),
           },
         },
       },
       include: { items: { include: { options: true } }, payment: true },
     });
 
+    if (promotionId) {
+      await tx.promotion.update({
+        where: { id: promotionId },
+        data: { usageCount: { increment: 1 } },
+      });
+    }
+
     return created;
   });
+
+  // Side effects deliberately run after the transaction commits: an analytics
+  // write or a notification must never be able to roll back a real order.
+  await track({
+    name: "order_created",
+    sessionId: input.sessionId,
+    orderId: order.id,
+    valueMinor: order.totalMinor,
+    metadata: { pickupMode: order.pickupMode, paymentMethod: order.payment?.method },
+  });
+  await notifyOrderStatus(order.id, initialStatus);
 
   return order;
 }
 
-export async function getOrderByTrackingToken(token: string) {
+async function findOrderByIdempotencyKey(key: string): Promise<CreatedOrder | null> {
   return prisma.order.findUnique({
-    where: { trackingToken: token },
-    include: { items: { include: { options: true } }, payment: true, statusHistory: true },
+    where: { idempotencyKey: key },
+    include: { items: { include: { options: true } }, payment: true },
   });
+}
+
+function assertPaymentMethodEnabled(
+  restaurant: RestaurantWithConfig,
+  method: CreateOrderInput["payment"]["method"]
+): void {
+  const config = restaurant.paymentMethods.find((entry) => entry.type === method);
+  if (!config || !config.enabled) {
+    // A disabled method reaching the server means the page was stale or the
+    // request was crafted; either way it is not a usable payment route.
+    throw new InvalidOptionsError(`Payment method ${method} is not enabled`);
+  }
 }
 
 /**
- * Lazily promotes CONFIRMED orders whose kitchenReleaseAt has arrived to
- * QUEUED. In production this should run on a scheduled job (see
- * docs/DECISIONS.md); for the MVP it is invoked whenever staff load the
- * kitchen or admin orders views, which is sufficient for a single-location
- * pilot and keeps the system dependency-free.
+ * Capacity is counted per slot *window*, not per exact timestamp — two orders
+ * for 19:00 and 19:07 both occupy the 19:00 quarter-hour. The check runs
+ * inside the creating transaction so a burst of simultaneous checkouts can't
+ * each see a free slot and all take it.
  */
-export async function releaseDueOrders(): Promise<number> {
-  const now = new Date();
-  const due = await prisma.order.findMany({
-    where: { status: "CONFIRMED", kitchenReleaseAt: { lte: now } },
+async function assertSlotHasCapacity(
+  tx: Prisma.TransactionClient,
+  slotStartAt: Date,
+  restaurant: RestaurantWithConfig,
+  config: SchedulingConfig
+): Promise<void> {
+  const taken = await tx.order.count({
+    where: { slotStartAt, status: { notIn: RELEASED_SLOT_STATUSES } },
   });
-  for (const order of due) {
-    await prisma.$transaction([
-      prisma.order.update({ where: { id: order.id }, data: { status: "QUEUED" } }),
-      prisma.orderStatusHistory.create({
-        data: { orderId: order.id, fromStatus: "CONFIRMED", toStatus: "QUEUED" },
-      }),
-    ]);
-  }
-  return due.length;
+  if (taken < restaurant.slotCapacity) return;
+
+  const nextSlot = nextValidPickupSlot(
+    new Date(slotStartAt.getTime() + restaurant.slotIntervalMinutes * 60 * 1000),
+    config
+  );
+  throw new SlotFullError(nextSlot);
 }
 
-export function orderIsDueSoon(kitchenReleaseAt: Date, now: Date = new Date()): boolean {
-  return isReadyForKitchenRelease(kitchenReleaseAt, now);
+/** Retries on collision; `reference` is unique, so a clash must not 500. */
+async function allocateReference(tx: Prisma.TransactionClient): Promise<string> {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const candidate = generateReference();
+    const clash = await tx.order.findUnique({ where: { reference: candidate }, select: { id: true } });
+    if (!clash) return candidate;
+  }
+  // Exhausted the short, friendly space — fall back to a longer but unique code.
+  return `PH-${randomBytes(4).toString("hex").toUpperCase()}`;
 }
 
 export type OrderWithRelations = Prisma.OrderGetPayload<{
-  include: { items: { include: { options: true } }; payment: true; statusHistory: true };
+  include: {
+    items: { include: { options: true } };
+    payment: { include: { receipt: { select: { id: true; contentType: true; byteSize: true } } } };
+    statusHistory: { include: { changedBy: { select: { name: true } } } };
+    notifications: true;
+  };
 }>;
+
+export async function getOrderByTrackingToken(token: string): Promise<OrderWithRelations | null> {
+  // Guard the length before hitting the database: a token is fixed-size, so
+  // anything else is a probe, not a customer.
+  if (token.length < 16 || token.length > 128) return null;
+  return prisma.order.findUnique({
+    where: { trackingToken: token },
+    include: {
+      items: { include: { options: true } },
+      payment: { include: { receipt: { select: { id: true, contentType: true, byteSize: true } } } },
+      statusHistory: { include: { changedBy: { select: { name: true } } }, orderBy: { createdAt: "asc" } },
+      notifications: true,
+    },
+  });
+}
+
+export async function getOrderById(id: string): Promise<OrderWithRelations | null> {
+  return prisma.order.findUnique({
+    where: { id },
+    include: {
+      items: { include: { options: true } },
+      payment: { include: { receipt: { select: { id: true, contentType: true, byteSize: true } } } },
+      statusHistory: { include: { changedBy: { select: { name: true } } }, orderBy: { createdAt: "asc" } },
+      notifications: true,
+    },
+  });
+}
+
+export interface SlotAvailability {
+  at: Date;
+  remaining: number;
+}
+
+/**
+ * The pickup slots a customer may actually choose: open, far enough ahead for
+ * preparation, and not already full. The checkout picker renders exactly this
+ * list, and `createOrder` re-validates against the same rules — so a customer
+ * is never offered a time the server would then refuse (docs/PRD.md §12.3).
+ */
+export async function getAvailablePickupSlots(
+  prepMinutes?: number,
+  now = new Date()
+): Promise<SlotAvailability[]> {
+  const restaurant = await getRestaurant();
+  const config = schedulingConfigFor(restaurant);
+  const effectivePrep = prepMinutes ?? restaurant.defaultPrepMinutes;
+
+  const slots = generatePickupSlots(earliestPossiblePickup(now, effectivePrep), config);
+  if (slots.length === 0) return [];
+
+  const counts = await prisma.order.groupBy({
+    by: ["slotStartAt"],
+    where: {
+      slotStartAt: { gte: slots[0], lte: slots[slots.length - 1] },
+      status: { notIn: RELEASED_SLOT_STATUSES },
+    },
+    _count: { _all: true },
+  });
+  const takenBySlot = new Map(counts.map((row) => [row.slotStartAt.getTime(), row._count._all]));
+
+  return slots
+    .map((at) => ({
+      at,
+      remaining: restaurant.slotCapacity - (takenBySlot.get(at.getTime()) ?? 0),
+    }))
+    .filter((slot) => slot.remaining > 0);
+}
+
+/**
+ * Promotes confirmed orders whose kitchen-release time has arrived into the
+ * kitchen queue. This is the mechanism that keeps a 19:00 order out of the
+ * kitchen at 16:00 (docs/PRD.md §13, §26).
+ *
+ * Called both by the scheduled job (`/api/cron/release-orders`) and
+ * opportunistically when staff load the kitchen or orders screens, so the
+ * behavior is correct even if the scheduler is not configured.
+ */
+export async function releaseDueOrders(now = new Date()): Promise<number> {
+  const due = await prisma.order.findMany({
+    where: { status: "CONFIRMED", kitchenReleaseAt: { lte: now } },
+    select: { id: true },
+  });
+  if (due.length === 0) return 0;
+
+  let released = 0;
+  for (const { id } of due) {
+    // Guarded update: if another request (or the cron job) moved this order
+    // first, the `status` filter makes this a no-op instead of a double
+    // history entry.
+    const result = await prisma.order.updateMany({
+      where: { id, status: "CONFIRMED" },
+      data: { status: "QUEUED", queuedAt: now },
+    });
+    if (result.count === 0) continue;
+    released += 1;
+    await prisma.orderStatusHistory.create({
+      data: { orderId: id, fromStatus: "CONFIRMED", toStatus: "QUEUED", reason: "kitchen_release" },
+    });
+  }
+  return released;
+}

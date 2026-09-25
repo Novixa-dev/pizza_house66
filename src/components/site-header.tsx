@@ -1,35 +1,118 @@
 import Link from "next/link";
+import Image from "next/image";
 import { headers } from "next/headers";
 import type { Locale } from "@/lib/i18n/dictionaries";
 import { getDictionary } from "@/lib/i18n/dictionaries";
-import { otherLocale } from "@/lib/i18n/locale";
+import { otherLocale } from "@/lib/i18n/pick";
 import { CartLink } from "./cart-link";
+import { Badge } from "./ui";
 
-export async function SiteHeader({ locale }: { locale: Locale }) {
+/**
+ * The header is a server component so the cart badge is the only thing that
+ * ships JavaScript. Language switching is a plain form POST rather than a
+ * client handler, which means it works before hydration and on a device with
+ * scripting blocked.
+ */
+export async function SiteHeader({
+  locale,
+  isOpen,
+  ordersPaused,
+}: {
+  locale: Locale;
+  isOpen: boolean;
+  ordersPaused: boolean;
+}) {
   const t = getDictionary(locale);
+
+  // Return the customer to the page they switched language on, not to "/".
+  // Only the path is kept — an absolute referer could be an open redirect.
   const referer = (await headers()).get("referer");
-  const redirectTo = referer ? new URL(referer).pathname : "/";
+  let redirectTo = "/";
+  if (referer) {
+    try {
+      const url = new URL(referer);
+      redirectTo = `${url.pathname}${url.search}`;
+    } catch {
+      redirectTo = "/";
+    }
+  }
+
+  const navLinks = [
+    { href: "/menu", label: t.common.menu },
+    { href: "/#offers", label: t.common.offers },
+    { href: "/#visit", label: t.common.contact },
+  ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 font-bold text-lg text-brand">
-          🍕 <span>{t.common.siteName}</span>
+    <header className="sticky top-0 z-40 border-b border-line bg-surface/90 backdrop-blur-md">
+      <div className="container-page flex h-16 items-center justify-between gap-3">
+        <Link
+          href="/"
+          className="flex shrink-0 items-center gap-2.5 font-extrabold tracking-tight text-ink"
+        >
+          <Image src="/brand/logo.svg" alt="" width={34} height={34} priority />
+          <span className="text-base sm:text-lg">{t.common.siteName}</span>
         </Link>
-        <nav className="flex items-center gap-4 text-sm">
-          <Link href="/menu" className="hover:text-brand">
-            {t.common.menu}
-          </Link>
+
+        <nav aria-label={t.nav.primary} className="hidden items-center gap-1 md:flex">
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="rounded-[var(--radius-sm)] px-3 py-2 text-sm font-semibold text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="flex items-center gap-2 sm:gap-3">
+          {ordersPaused ? (
+            <Badge tone="danger" className="hidden sm:inline-flex">
+              {t.checkout.orderingPaused.split(".")[0]}
+            </Badge>
+          ) : (
+            <Badge tone={isOpen ? "success" : "neutral"} className="hidden sm:inline-flex">
+              <span
+                className={`inline-block h-1.5 w-1.5 rounded-full ${isOpen ? "bg-accent" : "bg-ink-muted"}`}
+                aria-hidden="true"
+              />
+              {isOpen ? t.common.openNow : t.common.closedNow}
+            </Badge>
+          )}
+
           <CartLink label={t.common.cart} />
-          <form action="/api/locale" method="post">
+
+          <form action="/api/locale" method="post" className="contents">
             <input type="hidden" name="locale" value={otherLocale(locale)} />
             <input type="hidden" name="redirectTo" value={redirectTo} />
-            <button type="submit" className="rounded border border-border px-2 py-1 hover:bg-background">
+            <button
+              type="submit"
+              lang={otherLocale(locale)}
+              className="rounded-[var(--radius-sm)] border border-line-strong px-2.5 py-1.5 text-xs font-bold text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink"
+            >
               {t.common.language}
             </button>
           </form>
-        </nav>
+        </div>
       </div>
+
+      {/* Mobile nav sits below the bar rather than behind a toggle: three
+          links do not justify a JavaScript menu on the critical path. */}
+      <nav
+        aria-label={t.nav.primary}
+        className="scroll-row flex gap-1 border-t border-line px-4 py-2 md:hidden"
+      >
+        {navLinks.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className="whitespace-nowrap rounded-[var(--radius-pill)] bg-surface-muted px-3.5 py-1.5 text-xs font-bold text-ink-soft"
+          >
+            {link.label}
+          </Link>
+        ))}
+      </nav>
     </header>
   );
 }

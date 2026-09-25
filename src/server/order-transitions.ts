@@ -1,30 +1,88 @@
+import "server-only";
+
 import { prisma } from "@/lib/db";
 import { assertTransitionAllowed } from "@/lib/order-state";
+import { can, ForbiddenError } from "@/lib/permissions";
 import type { OrderStatus, Role } from "@prisma/client";
+import { recordAudit } from "./audit";
+import { notifyOrderStatus } from "./notifications";
+import { track } from "./analytics";
+
+// Every staff-initiated change to an order or a payment funnels through this
+// module. It is the single place that:
+//   - checks the transition is legal and the actor is allowed,
+//   - writes the status change and its history row in one transaction,
+//   - stamps the matching timestamp column,
+//   - and records the audit trail and customer notification afterwards.
+//
+// Doing all five in one place is what makes "the client cannot manipulate
+// order state" a property of the system rather than a hope.
+
+export interface StaffActor {
+  id: string;
+  name: string;
+  role: Role;
+}
+
+const TIMESTAMP_FIELD: Partial<Record<OrderStatus, string>> = {
+  CONFIRMED: "confirmedAt",
+  QUEUED: "queuedAt",
+  PREPARING: "preparingAt",
+  READY: "readyAt",
+  COMPLETED: "completedAt",
+  CANCELLED: "cancelledAt",
+};
+
+const ANALYTICS_FOR_STATUS: Partial<Record<OrderStatus, "order_preparing" | "order_ready" | "order_completed" | "order_cancelled">> = {
+  PREPARING: "order_preparing",
+  READY: "order_ready",
+  COMPLETED: "order_completed",
+  CANCELLED: "order_cancelled",
+};
+
+export class OrderNotFoundError extends Error {
+  constructor() {
+    super("Order not found");
+    this.name = "OrderNotFoundError";
+  }
+}
+
+export class ConcurrentUpdateError extends Error {
+  constructor() {
+    super("The order changed while you were working on it. Reload and try again.");
+    this.name = "ConcurrentUpdateError";
+  }
+}
 
 export async function transitionOrder(
   orderId: string,
   toStatus: OrderStatus,
-  actor: { id: string; role: Role },
+  actor: StaffActor,
   reason?: string
-) {
-  const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+): Promise<void> {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { id: true, status: true, totalMinor: true },
+  });
+  if (!order) throw new OrderNotFoundError();
+
   assertTransitionAllowed(order.status, toStatus, actor.role);
 
-  const timestampField: Partial<Record<OrderStatus, string>> = {
-    CONFIRMED: "confirmedAt",
-    PREPARING: "preparingAt",
-    READY: "readyAt",
-    COMPLETED: "completedAt",
-    CANCELLED: "cancelledAt",
-  };
-  const extraData: Record<string, Date> = {};
-  const field = timestampField[toStatus];
-  if (field) extraData[field] = new Date();
+  const field = TIMESTAMP_FIELD[toStatus];
+  const now = new Date();
 
-  await prisma.$transaction([
-    prisma.order.update({ where: { id: orderId }, data: { status: toStatus, ...extraData } }),
-    prisma.orderStatusHistory.create({
+  await prisma.$transaction(async (tx) => {
+    // Conditioning the update on the status we validated against turns a
+    // concurrent double-click by two staff members into one winner and one
+    // clear error, instead of two history rows for the same move
+    // (docs/PRD.md §46).
+    const result = await tx.order.updateMany({
+      where: { id: orderId, status: order.status },
+      data: { status: toStatus, ...(field ? { [field]: now } : {}) },
+    });
+    if (result.count === 0) throw new ConcurrentUpdateError();
+
+    await tx.orderStatusHistory.create({
       data: {
         orderId,
         fromStatus: order.status,
@@ -32,31 +90,94 @@ export async function transitionOrder(
         changedById: actor.id,
         reason,
       },
-    }),
-  ]);
+    });
+  });
+
+  await recordAudit({
+    actor,
+    action: toStatus === "CANCELLED" ? "order.cancel" : "order.transition",
+    entity: "Order",
+    entityId: orderId,
+    metadata: { from: order.status, to: toStatus, reason: reason ?? null },
+  });
+  await notifyOrderStatus(orderId, toStatus, reason);
+
+  const analyticsEvent = ANALYTICS_FOR_STATUS[toStatus];
+  if (analyticsEvent) {
+    await track({ name: analyticsEvent, orderId, valueMinor: order.totalMinor });
+  }
 }
 
-export async function verifyPayment(paymentId: string, actor: { id: string; role: Role }) {
-  const payment = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
-  await prisma.$transaction([
-    prisma.payment.update({ where: { id: paymentId }, data: { status: "VERIFIED" } }),
-    prisma.paymentStatusHistory.create({
+export async function verifyPayment(
+  paymentId: string,
+  actor: StaffActor,
+  note?: string
+): Promise<void> {
+  if (!can(actor.role, "payments.verify")) throw new ForbiddenError("payments.verify");
+
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    select: { id: true, status: true, orderId: true, amountMinor: true, order: { select: { status: true } } },
+  });
+  if (!payment) throw new OrderNotFoundError();
+
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.payment.updateMany({
+      where: { id: paymentId, status: payment.status },
+      data: { status: "VERIFIED" },
+    });
+    if (result.count === 0) throw new ConcurrentUpdateError();
+
+    await tx.paymentStatusHistory.create({
       data: {
         paymentId,
         fromStatus: payment.status,
         toStatus: "VERIFIED",
         reviewedById: actor.id,
+        reason: note,
       },
-    }),
-  ]);
-  await transitionOrder(payment.orderId, "CONFIRMED", actor);
+    });
+  });
+
+  await recordAudit({
+    actor,
+    action: "payment.verify",
+    entity: "Payment",
+    entityId: paymentId,
+    metadata: { orderId: payment.orderId, from: payment.status, amountMinor: payment.amountMinor },
+  });
+  await track({ name: "payment_verified", orderId: payment.orderId, valueMinor: payment.amountMinor });
+
+  // Approving the transfer is what confirms the order — but only if the order
+  // is still waiting for it. An order cancelled in the meantime stays
+  // cancelled; the payment is simply recorded as verified for the refund
+  // conversation (docs/PRD.md §26 edge cases, §46).
+  if (payment.order.status === "PAYMENT_PENDING" || payment.order.status === "PENDING") {
+    await transitionOrder(payment.orderId, "CONFIRMED", actor, "payment_verified");
+  }
 }
 
-export async function rejectPayment(paymentId: string, actor: { id: string; role: Role }, reason: string) {
-  const payment = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId } });
-  await prisma.$transaction([
-    prisma.payment.update({ where: { id: paymentId }, data: { status: "REJECTED" } }),
-    prisma.paymentStatusHistory.create({
+export async function rejectPayment(
+  paymentId: string,
+  actor: StaffActor,
+  reason: string
+): Promise<void> {
+  if (!can(actor.role, "payments.reject")) throw new ForbiddenError("payments.reject");
+
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    select: { id: true, status: true, orderId: true, amountMinor: true, order: { select: { status: true } } },
+  });
+  if (!payment) throw new OrderNotFoundError();
+
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.payment.updateMany({
+      where: { id: paymentId, status: payment.status },
+      data: { status: "REJECTED" },
+    });
+    if (result.count === 0) throw new ConcurrentUpdateError();
+
+    await tx.paymentStatusHistory.create({
       data: {
         paymentId,
         fromStatus: payment.status,
@@ -64,15 +185,35 @@ export async function rejectPayment(paymentId: string, actor: { id: string; role
         reviewedById: actor.id,
         reason,
       },
-    }),
-  ]);
-  await transitionOrder(payment.orderId, "REJECTED", actor, reason);
+    });
+  });
+
+  await recordAudit({
+    actor,
+    action: "payment.reject",
+    entity: "Payment",
+    entityId: paymentId,
+    metadata: { orderId: payment.orderId, from: payment.status, reason },
+  });
+  await track({ name: "payment_rejected", orderId: payment.orderId, valueMinor: payment.amountMinor });
+
+  if (payment.order.status === "PAYMENT_PENDING" || payment.order.status === "PENDING") {
+    await transitionOrder(payment.orderId, "REJECTED", actor, reason);
+  }
 }
 
-export async function setOnlineOrderingPaused(paused: boolean) {
-  const restaurant = await prisma.restaurant.findFirstOrThrow();
+export async function setOnlineOrderingPaused(paused: boolean, actor: StaffActor): Promise<void> {
+  if (!can(actor.role, "ordering.pause")) throw new ForbiddenError("ordering.pause");
+
+  const restaurant = await prisma.restaurant.findFirstOrThrow({ select: { id: true } });
   await prisma.restaurant.update({
     where: { id: restaurant.id },
     data: { onlineOrderingPaused: paused },
+  });
+  await recordAudit({
+    actor,
+    action: paused ? "ordering.pause" : "ordering.resume",
+    entity: "Restaurant",
+    entityId: restaurant.id,
   });
 }

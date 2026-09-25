@@ -1,53 +1,307 @@
 @import "tailwindcss";
 
-:root {
-  --background: #fbf7f2;
-  --foreground: #221a15;
-  --surface: #ffffff;
-  --border: #e7ddd0;
-  --brand: #b3261e;
-  --brand-dark: #8a1c16;
-  --brand-contrast: #ffffff;
-  --accent: #1f6f4a;
-  --muted: #6b5c4f;
-}
+/* ---------------------------------------------------------------------------
+   Design tokens (docs/DESIGN-SYSTEM.md)
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-surface: var(--surface);
-  --color-border: var(--border);
-  --color-brand: var(--brand);
-  --color-brand-dark: var(--brand-dark);
-  --color-brand-contrast: var(--brand-contrast);
-  --color-accent: var(--accent);
-  --color-muted: var(--muted);
-  --font-sans: var(--font-sans);
-  --font-arabic: var(--font-arabic);
+   One warm, food-forward palette expressed as CSS custom properties, then
+   exposed to Tailwind through @theme. Components only ever reference the
+   semantic names (surface, brand, muted…), never raw hex, so retheming for
+   another restaurant — the Novixa Restaurant direction in docs/ROADMAP.md —
+   is a change to this block alone.
+
+   Contrast: every foreground/background pair used for text meets WCAG AA at
+   its rendered size in both schemes (docs/PRD.md §50).
+--------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light dark;
+
+  --page: #fbf7f1;
+  --page-elevated: #f4ece0;
+  --surface: #ffffff;
+  --surface-muted: #f8f3ea;
+  --ink: #1f1811;
+  --ink-soft: #5d4f42;
+  --ink-muted: #7a6a5b;
+  --line: #e7dbc9;
+  --line-strong: #d6c6ae;
+
+  --brand: #a8261c;
+  --brand-hover: #8c1d15;
+  --brand-soft: #fbeae8;
+  --brand-ink: #ffffff;
+
+  --accent: #2f6b4f;
+  --accent-soft: #e6f1ea;
+
+  --gold: #a9781f;
+  --gold-soft: #fbf1dc;
+
+  --danger: #b3261e;
+  --danger-soft: #fbeae8;
+
+  --info: #1f5f8b;
+  --info-soft: #e6f0f7;
+
+  --radius-sm: 0.5rem;
+  --radius: 0.875rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.75rem;
+
+  --shadow-sm: 0 1px 2px rgb(31 24 17 / 0.06), 0 1px 3px rgb(31 24 17 / 0.05);
+  --shadow: 0 4px 12px rgb(31 24 17 / 0.07), 0 2px 4px rgb(31 24 17 / 0.04);
+  --shadow-lg: 0 18px 40px rgb(31 24 17 / 0.12), 0 4px 10px rgb(31 24 17 / 0.05);
+
+  --header-height: 4rem;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #17120e;
-    --foreground: #f3ece3;
-    --surface: #221a15;
-    --border: #38291f;
-    --brand: #e4574a;
-    --brand-dark: #b3261e;
-    --accent: #3fa06d;
-    --muted: #b8a996;
+    --page: #14100b;
+    --page-elevated: #1b150f;
+    --surface: #1f1810;
+    --surface-muted: #271f16;
+    --ink: #f6efe4;
+    --ink-soft: #cbbba6;
+    --ink-muted: #a89681;
+    --line: #362b1f;
+    --line-strong: #4a3b2a;
+
+    --brand: #e8685a;
+    --brand-hover: #f08174;
+    --brand-soft: #3a1a16;
+    --brand-ink: #1a0e0c;
+
+    --accent: #63b98d;
+    --accent-soft: #14301f;
+
+    --gold: #e0b45f;
+    --gold-soft: #33260f;
+
+    --danger: #ef7b6f;
+    --danger-soft: #3a1a16;
+
+    --info: #7bb6de;
+    --info-soft: #14283a;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow: 0 4px 14px rgb(0 0 0 / 0.45);
+    --shadow-lg: 0 20px 44px rgb(0 0 0 / 0.55);
+  }
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-page-elevated: var(--page-elevated);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-ink: var(--brand-ink);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  --radius-card: var(--radius);
+  --radius-pill: 9999px;
+
+  --shadow-card: var(--shadow-sm);
+  --shadow-raised: var(--shadow);
+  --shadow-float: var(--shadow-lg);
+
+  --font-sans: var(--font-latin), system-ui, sans-serif;
+  --font-arabic: var(--font-arabic), var(--font-latin), system-ui, sans-serif;
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+--------------------------------------------------------------------------- */
+
+* {
+  border-color: var(--line);
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
 }
 
+/* Arabic gets a typeface designed for it, and slightly looser leading —
+   Arabic script needs the vertical room that Latin does not. */
 [dir="rtl"] body {
-  font-family: var(--font-arabic), var(--font-sans), sans-serif;
+  font-family: var(--font-arabic);
+  line-height: 1.75;
 }
 
-[dir="ltr"] body {
-  font-family: var(--font-sans), sans-serif;
+/* A visible, high-contrast focus ring everywhere. Keyboard users are not an
+   afterthought (docs/PRD.md §50). */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Western-Arabic digits, tabular, isolated left-to-right.
+   Prices, order references, times and phone numbers all read better this way
+   in a scannable column, and the isolation keeps "16:00 – 00:00" from being
+   reordered inside an RTL paragraph.
+
+   IMPORTANT: apply this to the number ONLY, never to a container that also
+   holds Arabic words — forcing `direction: ltr` on mixed content reorders the
+   label and eats the space between it and the value. Write
+   `<span className="numeric">{price}</span> ريال`, not
+   `<p className="numeric">يبدأ من {price}</p>`. */
+.numeric {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* ---------------------------------------------------------------------------
+   Utilities
+--------------------------------------------------------------------------- */
+
+.container-page {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 72rem;
+  padding-inline: 1rem;
+}
+
+@media (min-width: 640px) {
+  .container-page {
+    padding-inline: 1.5rem;
+  }
+}
+
+.hairline {
+  border-block-end: 1px solid var(--line);
+}
+
+/* Hides content visually while leaving it available to screen readers. */
+.sr-only-focusable:not(:focus):not(:focus-within) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* A quiet, warm texture behind hero sections — a hint of depth without the
+   gradient-soup the brief explicitly rules out (docs/PRD.md §48). */
+.hero-surface {
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% -10%, var(--brand-soft), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 100% 0%, var(--gold-soft), transparent 60%);
+}
+
+.card-interactive {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+
+@media (hover: hover) {
+  .card-interactive:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+    border-color: var(--line-strong);
+  }
+}
+
+/* Horizontal scrollers (category rails, slot pickers) without a scrollbar
+   stealing the row's height on desktop. */
+.scroll-row {
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scroll-row::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-row > * {
+  scroll-snap-align: start;
+}
+
+@keyframes ph-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.skeleton {
+  background: var(--surface-muted);
+  animation: ph-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes ph-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fade-in {
+  animation: ph-fade-in 220ms ease-out both;
+}
+
+/* Print: staff occasionally print an order ticket. Strip the furniture. */
+@media print {
+  header,
+  footer,
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
 }

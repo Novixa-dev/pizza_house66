@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="640" height="640" role="img">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="72%">
+      <stop offset="0%" stop-color="#f7ece0"/>
+      <stop offset="100%" stop-color="#e6d2b8"/>
+    </radialGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#2a1b10" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+  <rect width="640" height="640" fill="url(#bg)"/>
+  <g filter="url(#soft)">
+    <ellipse cx="320" cy="470" rx="215" ry="42" fill="#ffffff"/>
+    <rect x="165" y="250" width="310" height="215" rx="26" fill="#5c3a24"/>
+    <rect x="165" y="250" width="310" height="52" rx="26" fill="#3d2416"/>
+    <rect x="165" y="292" width="310" height="22" fill="#3d2416"/>
+    <circle cx="328.4" cy="440.9" r="9.7" fill="#faf3e6" opacity="0.7"/>
+    <circle cx="386.3" cy="242.2" r="10.5" fill="#faf3e6" opacity="0.7"/>
+    <circle cx="258.9" cy="330.4" r="8.4" fill="#faf3e6" opacity="0.7"/>
+    <circle cx="342.6" cy="305.6" r="9.1" fill="#faf3e6" opacity="0.7"/>
+    <circle cx="215.7" cy="331.2" r="9.0" fill="#faf3e6" opacity="0.7"/>
+    <circle cx="370.4" cy="256.1" r="10.7" fill="#faf3e6" opacity="0.7"/>
+    <circle cx="346.1" cy="304.5" r="14.9" fill="#faf3e6" opacity="0.7"/>
+    <circle cx="250.5" cy="418.7" r="12.2" fill="#faf3e6" opacity="0.7"/>
+    <circle cx="247.4" cy="277.6" r="14.9" fill="#faf3e6" opacity="0.7"/>
+    <path d="M 274 250 q 46 -70 92 0 z" fill="#faf3e6"/>
+  </g>
+</svg>
