@@ -702,6 +702,23 @@ async function seedStaff() {
 }
 
 async function main() {
+  // `SEED_ONLY_IF_EMPTY` makes this safe to run on every boot of a deployed
+  // container, which is how a fresh environment gets its first Restaurant row
+  // without anyone opening a shell.
+  //
+  // The guard matters because the seed upserts: run unconditionally against a
+  // live restaurant, it would rewrite every price and description the owner
+  // had edited back to the demo values on each redeploy. Seeding a database
+  // that already has a restaurant in it is never what anyone wants.
+  if (process.env.SEED_ONLY_IF_EMPTY === "1") {
+    const existing = await prisma.restaurant.count();
+    if (existing > 0) {
+      console.log("[seed] Restaurant already configured — skipping (SEED_ONLY_IF_EMPTY=1).");
+      return;
+    }
+    console.log("[seed] Empty database — seeding initial data.");
+  }
+
   console.log("[seed] Seeding Pizza House demo data…");
   await seedRestaurant();
   await seedCatalog();
