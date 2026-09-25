@@ -153,9 +153,18 @@ export function toDateOnly(instant: Date, timeZone: string): Date {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
-const LOCALE_TAG = { ar: "ar-YE", en: "en-GB" } as const;
+// `-u-nu-latn` pins the numbering system to Western-Arabic digits while
+// keeping Arabic month names, weekday names and the ص/م marker.
+//
+// Without it, `ar-YE` renders Arabic-Indic digits (٠٤:١٥) while `formatMoney`
+// renders Western ones (2,200) — so a single kitchen ticket or order row
+// shows two different digit systems side by side. The reasoning in
+// `src/lib/money.ts` for choosing Western digits applies at least as strongly
+// here: pickup times sit in scannable columns that staff read at a glance
+// and compare against a clock.
+const LOCALE_TAG = { ar: "ar-YE-u-nu-latn", en: "en-GB" } as const;
 
-/** Localized time of day, e.g. "٧:٣٠ م" / "19:30", rendered in restaurant time. */
+/** Localized time of day, e.g. "7:30 م" / "19:30", rendered in restaurant time. */
 export function formatTime(instant: Date, timeZone: string, locale: "ar" | "en"): string {
   return new Intl.DateTimeFormat(LOCALE_TAG[locale], {
     timeZone,
@@ -165,7 +174,7 @@ export function formatTime(instant: Date, timeZone: string, locale: "ar" | "en")
   }).format(instant);
 }
 
-/** Localized date, e.g. "الجمعة ٢٥ سبتمبر" / "Fri 25 Sep". */
+/** Localized date, e.g. "الجمعة 25 سبتمبر" / "Fri 25 Sep". */
 export function formatDate(instant: Date, timeZone: string, locale: "ar" | "en"): string {
   return new Intl.DateTimeFormat(LOCALE_TAG[locale], {
     timeZone,

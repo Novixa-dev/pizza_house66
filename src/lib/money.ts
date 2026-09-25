@@ -42,7 +42,7 @@ export function formatMoney(minor: number, currency: string, locale: "ar" | "en"
   }).format(amount);
 
   const label = CURRENCY_LABEL[currency]?.[locale] ?? currency;
-  return locale === "ar" ? `${formatted} ${label}` : `${formatted} ${label}`;
+  return `${formatted} ${label}`;
 }
 
 /** Signed form for option price deltas, e.g. "+300 ريال". */
@@ -58,7 +58,9 @@ export function formatNumber(value: number): string {
 }
 
 export function formatPercent(value: number, locale: "ar" | "en"): string {
-  return new Intl.NumberFormat(locale === "ar" ? "ar-YE" : "en-US", {
+  // `-u-nu-latn` for the same reason as every other number here — Arabic
+  // keeps its own percent sign placement, but the digits stay Western.
+  return new Intl.NumberFormat(locale === "ar" ? "ar-YE-u-nu-latn" : "en-US", {
     style: "percent",
     maximumFractionDigits: 1,
   }).format(value);

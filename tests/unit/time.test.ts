@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatDate,
+  formatDateTime,
   formatHHmm,
+  formatTime,
   getTimeZoneOffsetMs,
   getZonedParts,
   isSameZonedDay,
@@ -121,5 +124,36 @@ describe("minutesBetween", () => {
     const from = new Date("2026-01-06T13:00:00Z");
     expect(minutesBetween(from, new Date("2026-01-06T13:25:00Z"))).toBe(25);
     expect(minutesBetween(from, new Date("2026-01-06T12:45:00Z"))).toBe(-15);
+  });
+});
+
+describe("display formatting digits", () => {
+  // `formatMoney` renders Western-Arabic digits in Arabic deliberately (see
+  // src/lib/money.ts). If the date/time formatters don't, a single order row
+  // shows "2,200 ريال" next to "٠٤:١٥ م" — two digit systems in one line.
+  // This was a real bug; these assertions are what stop it coming back.
+  const EASTERN_ARABIC = /[\u0660-\u0669]/;
+  const instant = new Date("2026-01-06T16:15:00Z"); // 19:15 in Aden
+
+  it("renders Arabic times with Western-Arabic digits", () => {
+    const formatted = formatTime(instant, ADEN, "ar");
+    expect(formatted).not.toMatch(EASTERN_ARABIC);
+    expect(formatted).toMatch(/7:15/);
+  });
+
+  it("renders Arabic dates with Western-Arabic digits but Arabic month names", () => {
+    const formatted = formatDate(instant, ADEN, "ar");
+    expect(formatted).not.toMatch(EASTERN_ARABIC);
+    expect(formatted).toMatch(/6/);
+    // Still Arabic script for the words around the number.
+    expect(formatted).toMatch(/[\u0600-\u06FF]/);
+  });
+
+  it("renders Arabic date-times with Western-Arabic digits", () => {
+    expect(formatDateTime(instant, ADEN, "ar")).not.toMatch(EASTERN_ARABIC);
+  });
+
+  it("still renders English in 24-hour time", () => {
+    expect(formatTime(instant, ADEN, "en")).toMatch(/19:15/);
   });
 });
