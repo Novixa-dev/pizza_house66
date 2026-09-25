@@ -11,6 +11,7 @@ in this repository contains a real secret.
 | `AUTH_SECRET` | **Yes** | Signs staff session cookies (`src/lib/auth.ts`, `src/proxy.ts`). Must be ≥ 32 characters; the app throws rather than sign with a short key. Rotating it signs every staff member out and touches nothing else. |
 | `CRON_SECRET` | Production | Bearer token for `/api/cron/release-orders`. **Unset means the endpoint returns 401** — it fails closed. Without it, kitchen release falls back to happening whenever staff load the kitchen or orders page. |
 | `NEXT_PUBLIC_APP_URL` | Recommended | Public origin for canonical URLs, Open Graph, the sitemap and tracking links. Falls back to `VERCEL_PROJECT_PRODUCTION_URL`, then `VERCEL_URL`, then `http://localhost:3000` (`src/lib/site.ts`). Client-visible — never a secret. |
+| `SEED_ONLY_IF_EMPTY` | Deployments | Set to `1` to make `npm run db:seed` a no-op once a restaurant exists. **Required if the seed runs in a start command** — the seed upserts, so without the guard every redeploy rewrites the owner's edited prices and descriptions back to the demo values. |
 | `SEED_STAFF_PASSWORD` | No | Password for the demo accounts `npm run db:seed` creates. Defaults to `ChangeMe123!`. Development only. |
 
 Set automatically by the host and read but never written by this app:
@@ -71,6 +72,14 @@ createdb -h 127.0.0.1 -p 5433 -U postgres pizzahouse
 ```
 DATABASE_URL="postgresql://postgres@127.0.0.1:5433/pizzahouse?schema=public"
 ```
+
+## Node version
+
+`.nvmrc` pins Node 20 and `package.json#engines.node` requires `>=20.9.0`,
+which is the Next.js 16 baseline. Nixpacks, Vercel, `nvm use` and the CI
+workflow all read one of the two, so the version is declared once. Leaving it
+undeclared is how a builder ends up choosing Node 18 and failing at
+`next build`.
 
 ## Migrations, not `db push`
 

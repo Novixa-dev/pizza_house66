@@ -10,7 +10,7 @@ do not.
 
 | Requirement | Why |
 |---|---|
-| Node 20+ | Next.js 16 baseline |
+| Node 20+ | Next.js 16 baseline — declared in `.nvmrc` and `engines.node`, which Nixpacks, Vercel and nvm all read. Without it a builder picks its own default and `next build` refuses on Node 18. |
 | PostgreSQL 16 | `Json` columns, `@db.Date`, `bytea` receipts, `groupBy` reports |
 | `DATABASE_URL`, `AUTH_SECRET` | The app will not run without them |
 | `CRON_SECRET` + a schedule | Kitchen release on time rather than on page load |
@@ -87,6 +87,62 @@ DATABASE_URL="<production url>" npm run staff:create
 staff login actually signs in (proves cookies are `Secure`-correct behind the
 proxy), a scheduled order reaches the kitchen board without anyone loading a
 page (proves cron auth works), and the menu renders in Arabic RTL.
+
+## Deploying to Railway
+
+Railway builds from the repository with no plan restriction on
+organization-owned private repos, and can host the database beside the app —
+which is what the reference deployment uses.
+
+**1. Create the project and database.**
+
+```
+railway init                  # or the dashboard
+railway add --database postgres
+```
+
+**2. Create the app service** and connect it to this repository and branch.
+
+**3. Set its variables.** The database is referenced, not copied:
+
+```
+DATABASE_URL         ${{Postgres.DATABASE_URL}}
+AUTH_SECRET          <openssl rand -hex 32>
+CRON_SECRET          <a different openssl rand -hex 32>
+NODE_ENV             production
+SEED_ONLY_IF_EMPTY   1
+```
+
+`${{Postgres.DATABASE_URL}}` is Railway's reference syntax: the app resolves
+it at runtime from the database service, so the credential is never copied
+into a second place and never has to be read out by a human or a tool.
+
+**4. `railway.json` does the rest.** It is committed, so nothing needs
+configuring in the dashboard:
+
+```json
+{
+  "build": { "builder": "NIXPACKS" },
+  "deploy": {
+    "startCommand": "npm run db:migrate && npm run db:seed && npm start",
+    "healthcheckPath": "/",
+    "healthcheckTimeout": 180,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
+  }
+}
+```
+
+`db:seed` in a start command is only safe because of `SEED_ONLY_IF_EMPTY=1`:
+the seed upserts, so without the guard every redeploy would rewrite the
+owner's edited prices and descriptions back to the demo values. With it, the
+seed runs once on an empty database and is a no-op forever after. **Never
+set that start command without that variable.**
+
+**5. Generate a domain**, then walk `docs/QA-CHECKLIST.md`.
+
+For the cron job, Railway has no built-in scheduler on every plan — use the
+external `curl` schedule below, or a small cron service in the same project.
 
 ## Deploying anywhere else
 
