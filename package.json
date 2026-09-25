@@ -16,6 +16,7 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
+    "smoke": "node scripts/smoke.mjs",
     "typecheck": "tsc --noEmit",
     "art": "node scripts/generate-menu-art.mjs",
     "db:migrate": "prisma migrate deploy",
