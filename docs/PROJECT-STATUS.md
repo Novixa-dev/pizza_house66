@@ -6,6 +6,22 @@ blocked on someone other than a developer.
 Legend: ✅ built and tested · ⚠️ built with a stated limit · ⬜ not built,
 deliberately · 🔑 blocked on the owner
 
+## Live deployment
+
+A working deployment runs on Railway: the Next.js app and a PostgreSQL 16
+instance in one project, with the app referencing the database internally
+(`${{Postgres.DATABASE_URL}}`), so the credential is never copied anywhere.
+
+On each deploy it runs `prisma migrate deploy`, then `db:seed` (a no-op once
+a restaurant exists, via `SEED_ONLY_IF_EMPTY=1`), then `next start` behind a
+health check on `/`. The seeded staff accounts use the deployment's
+`SEED_STAFF_PASSWORD`; **replace them with real accounts via
+`npm run staff:create` before the restaurant uses this** — see
+`docs/HANDOVER.md` §4.
+
+This is a demonstration deployment carrying the illustrative menu from
+`docs/ASSUMPTIONS.md`, not a live restaurant's system.
+
 ---
 
 ## Customer experience
