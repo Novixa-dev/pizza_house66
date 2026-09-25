@@ -1,74 +1,186 @@
 # Pizza House — Digital Ordering & Restaurant Operations Platform
 
-A bilingual (Arabic-first RTL / English) online ordering platform for Pizza
-House (Al Mukalla, Yemen), built around one idea: customers order ahead and
-choose a pickup time, and the system works out exactly when the kitchen
-should start preparing so the order is ready when the customer arrives —
-not before, not after. See `docs/PROJECT_ORIGIN.md` for the full story
-behind that idea and `docs/PRD.md` for the complete product requirements.
+A bilingual (Arabic-first RTL / English LTR) ordering and operations platform
+for Pizza House, Al Mukalla, Yemen.
 
-This is also the reference implementation for a future reusable product,
-**Novixa Restaurant** — see `docs/ROADMAP.md`.
+It is built around one idea, taken from `docs/PROJECT_ORIGIN.md` §4: the
+customer chooses **when they want to collect their food**, and the system
+works backwards from that to decide **when the kitchen should start** — so the
+order is ready as they arrive, not sitting under a lamp for forty minutes and
+not still in the oven.
 
-## What's here
+Everything else in the product exists to make that one promise keepable:
+slot capacity so the kitchen is never handed more than it can cook, a
+release scheduler that feeds the kitchen display on time, a payment flow that
+does not let an unverified transfer take a slot, and a staff panel where the
+restaurant can change every rule without a developer.
 
-- Public site: home, database-driven menu, product customization (generic
-  size/add-on option system), cart, checkout with guest info, scheduled or
-  ASAP pickup, configurable payment methods, order tracking.
-- Staff admin: order list, bank-transfer payment verification, pause/resume
-  online ordering — behind real authentication and role-based access.
-- Kitchen display: queued/preparing/ready board with one-tap status updates.
-- The scheduling engine that computes kitchen-release time from pickup time
-  and preparation duration, with business-hours and slot-capacity
-  validation (`src/lib/scheduling.ts`).
+This is also the reference implementation for **Novixa Restaurant**, a
+reusable product for other restaurants — see `docs/ROADMAP.md`.
 
-See `docs/ARCHITECTURE.md` for how it fits together and `docs/ROADMAP.md`
-for what's built vs. deferred.
+---
+
+## The core mechanic in one diagram
+
+```
+ customer picks pickup 19:00
+            │
+            │  prep time for this basket = 25 min  (per-product, max of items)
+            ▼
+ kitchenReleaseAt = 19:00 − 25 min = 18:35
+            │
+            ├── 16:00  order placed        → CONFIRMED, invisible to the kitchen
+            ├── 18:35  release scheduler    → QUEUED, appears on the kitchen display
+            ├── 18:37  cook starts          → PREPARING
+            └── 18:58  food is bagged       → READY   (customer notified)
+                19:00  customer arrives     → COMPLETED
+```
+
+Worked through in `src/lib/scheduling.ts`, tested to the minute in
+`tests/unit/scheduling.test.ts`, and explained in `docs/ARCHITECTURE.md`.
+
+---
+
+## What is built
+
+**Customer site** (`/`)
+- Home with hours, location, payment methods and `Restaurant` structured data
+- Database-driven menu with category filter and search
+- Product pages with a generic option system (size, crust, add-ons) and
+  live price preview
+- Cart persisted client-side across reloads
+- Checkout: guest details, ASAP or a specific pickup slot, promo code,
+  payment method, bank-transfer receipt upload
+- Order tracking by unguessable token, with a live timeline and auto-refresh
+- Arabic (default, RTL) and English (LTR) throughout
+
+**Staff admin** (`/admin`)
+- Dashboard: today's revenue, order counts, live queue, upcoming pickups
+- Orders: filterable list, full detail, status transitions, cancellation
+- Payments: bank-transfer verification queue with receipt viewing
+- Products, categories, option groups and values: full CRUD
+- Promotions: percentage/fixed, minimum order, cap, date window, usage limit
+- Customers: order history by phone
+- Hours: weekly schedule plus dated overrides (holidays, closures)
+- Settings: every restaurant-level rule, including pausing online ordering
+- Staff: accounts and roles
+- Reports: revenue, top products, payment mix, funnel
+- Audit: who changed what, when
+
+**Kitchen display** (`/kitchen`)
+- Queued / Preparing / Ready board, auto-refreshing, one tap per transition
+- Deliberately outside the admin shell — a cook needs no navigation
+
+---
 
 ## Quick start
 
+Requires Node 20+ and a PostgreSQL 16 database.
+
 ```bash
 cp .env.example .env
+# set DATABASE_URL, then:
 sed -i "s/replace-with-a-long-random-secret/$(openssl rand -hex 32)/" .env
+
 npm install
-npm run db:push
-npm run db:seed
+npm run db:migrate:dev     # create the schema
+npm run db:seed            # demo restaurant, menu, staff
 npm run dev
 ```
 
-Then open http://localhost:3000. Staff/kitchen login is at
-`/admin/login` — demo accounts are printed by `npm run db:seed`.
+Open http://localhost:3000. Staff sign-in is at `/admin/login`; the seed
+script prints the demo accounts and their password.
+
+Full setup, including a local Postgres in one command, is in
+`docs/ENVIRONMENT.md`.
+
+---
 
 ## Scripts
 
 | Command | Purpose |
 |---|---|
-| `npm run dev` | Start the dev server |
-| `npm run build` / `npm start` | Production build / start |
-| `npm run lint` | ESLint |
-| `npm test` | Unit tests (Vitest) — scheduling & order-state rules |
-| `npm run db:push` | Sync the Prisma schema to the SQLite dev database |
+| `npm run dev` | Development server |
+| `npm run build` / `npm start` | Production build / serve |
+| `npm run verify` | typecheck → lint → unit tests → build. Run this before pushing |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` | ESLint (flat config) |
+| `npm test` | Unit tests (Vitest) |
+| `npm run test:integration` | Integration tests against a real database |
+| `npm run test:e2e` | Playwright end-to-end suite |
+| `npm run db:migrate:dev` | Create/apply a migration in development |
+| `npm run db:migrate` | `prisma migrate deploy` — the production path |
 | `npm run db:seed` | Load demo restaurant/menu/staff data |
-| `npm run db:reset` | Drop and recreate the dev database, then reseed |
+| `npm run db:reset` | Drop, re-migrate and reseed |
+| `npm run staff:create` | Create a real staff account interactively |
+| `npm run art` | Regenerate the menu illustrations |
 
-## Important: the seed data is not real
+---
 
-Menu items, prices, hours, and contact details are illustrative
-placeholders, not the real Pizza House menu — Instagram/web access needed
-to verify them was blocked in the environment this was built in. See
-`docs/RESTAURANT_DISCOVERY.md` and `docs/ASSUMPTIONS.md` before treating any
-of it as fact, and definitely before any production launch.
+## Test status
+
+| Suite | Count | Command |
+|---|---|---|
+| Unit | 84 | `npm test` |
+| Integration | 24 | `npm run test:integration` |
+| End-to-end | 48 | `npm run test:e2e` |
+
+All passing, with lint, typecheck and build clean. What each suite covers —
+and what it deliberately does not — is in `docs/TESTING.md`.
+
+---
+
+## Read this before going live
+
+Two things are placeholders, and both are the restaurant's to supply:
+
+1. **The menu, prices, hours and contact details are illustrative.** They were
+   never verified against the real Pizza House — see
+   `docs/RESTAURANT_DISCOVERY.md` for why, and `docs/ASSUMPTIONS.md` for the
+   complete list of what needs confirming. Every one of them is editable from
+   the admin panel; none is hardcoded.
+2. **The product images are illustrations, not photographs.** Real food
+   photography has to come from the restaurant. Each illustration sits at
+   exactly the path a real photo will replace.
+
+`docs/HANDOVER.md` is the checklist for turning this into a live restaurant's
+system.
+
+---
 
 ## Documentation
 
-- `docs/PROJECT_ORIGIN.md` — why this exists (source vision document)
-- `docs/PRD.md` — full product requirements (source PRD)
-- `docs/RESTAURANT_DISCOVERY.md` — what was/wasn't verifiable about the real restaurant
-- `docs/ASSUMPTIONS.md` — every placeholder that needs owner confirmation
-- `docs/ARCHITECTURE.md` — module layout and request flow
-- `docs/DATABASE.md` — data model rationale
-- `docs/DECISIONS.md` — architectural decisions and tradeoffs made building this
-- `docs/SECURITY.md` — what's implemented vs. still open
-- `docs/TESTING.md` — what's tested vs. still needed
-- `docs/ENVIRONMENT.md` — environment variables
+**Start here**
+- `docs/PROJECT-STATUS.md` — what is done, what is not, in one table
+- `docs/HANDOVER.md` — everything the owner must do to go live
+- `docs/ARCHITECTURE.md` — module layout and the request flow that matters
+- `docs/DECISIONS.md` — the architectural choices and what each one costs
+
+**The domain**
+- `docs/ORDER-STATE-MACHINE.md` — the order lifecycle, transition by transition
+- `docs/PAYMENT-FLOW.md` — cash, bank transfer, receipts, verification
+- `docs/ROLES-PERMISSIONS.md` — the permission matrix and how it is enforced
+- `docs/DATABASE.md` — the data model and why it is shaped that way
+- `docs/API.md` — every HTTP endpoint and its error codes
+
+**The build**
+- `docs/DESIGN-SYSTEM.md` — tokens, components, RTL rules
+- `docs/LOCALIZATION.md` — the bilingual system and the bidi rules
+- `docs/SEO.md` — what is implemented and the one real limitation
+- `docs/ANALYTICS.md` — the first-party funnel
+- `docs/SECURITY.md` — the threat model, control by control
+- `docs/TESTING.md` — the three suites and the gaps
+- `docs/QA-CHECKLIST.md` — the manual pass before any release
+- `docs/ENVIRONMENT.md` — every variable
+- `docs/DEPLOYMENT.md` — deploying to Vercel or anywhere else
+
+**The source material**
+- `docs/PROJECT_ORIGIN.md` — the original vision document
+- `docs/PRD.md` — the full product requirements
+- `docs/RESTAURANT_DISCOVERY.md` — what was and was not verifiable
+- `docs/ASSUMPTIONS.md` — every placeholder awaiting confirmation
 - `docs/ROADMAP.md` — phase-by-phase status
+
+---
+
+Built by **Novixa**. Licensed to Pizza House.

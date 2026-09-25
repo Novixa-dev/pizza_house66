@@ -627,18 +627,32 @@ export async function releaseDueOrders(now = new Date()): Promise<number> {
 
   let released = 0;
   for (const { id } of due) {
-    // Guarded update: if another request (or the cron job) moved this order
-    // first, the `status` filter makes this a no-op instead of a double
-    // history entry.
-    const result = await prisma.order.updateMany({
-      where: { id, status: "CONFIRMED" },
-      data: { status: "QUEUED", queuedAt: now },
+    // One transaction per order rather than one for the batch: a single
+    // order that cannot be released must not hold back the rest of the
+    // kitchen's queue.
+    const moved = await prisma.$transaction(async (tx) => {
+      // Guarded update: if another request (or a concurrent run of this same
+      // job) moved this order first, the `status` filter makes this a no-op
+      // instead of a double history entry.
+      const result = await tx.order.updateMany({
+        where: { id, status: "CONFIRMED" },
+        data: { status: "QUEUED", queuedAt: now },
+      });
+      if (result.count === 0) return false;
+      // Inside the transaction so there is no window in which an order has
+      // moved but nothing records that it did — the same invariant
+      // `transitionOrder` keeps for staff-initiated changes.
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: id,
+          fromStatus: "CONFIRMED",
+          toStatus: "QUEUED",
+          reason: "kitchen_release",
+        },
+      });
+      return true;
     });
-    if (result.count === 0) continue;
-    released += 1;
-    await prisma.orderStatusHistory.create({
-      data: { orderId: id, fromStatus: "CONFIRMED", toStatus: "QUEUED", reason: "kitchen_release" },
-    });
+    if (moved) released += 1;
   }
   return released;
 }
