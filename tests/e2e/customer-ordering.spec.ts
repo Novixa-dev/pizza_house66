@@ -107,6 +107,13 @@ test.describe("customer ordering", () => {
     const slots = page.getByTestId("pickup-slots").getByRole("button");
     await expect(slots.first()).toBeVisible();
 
+    // Wait for webfonts before clicking a slot. `next/font` swaps the Arabic
+    // face in after first paint, which reflows the slot grid — Playwright
+    // then refuses the click because the target is still moving, and the
+    // failure reads as a timeout on a button that is plainly there. Waiting
+    // for the real settle beats widening the timeout and hoping.
+    await page.evaluate(() => document.fonts.ready);
+
     // Every offered time is a button the server produced — there is no free
     // text field, so an arbitrary timestamp cannot be entered at all
     // (docs/PRD.md §12.3).

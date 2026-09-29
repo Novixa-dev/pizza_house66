@@ -22,7 +22,10 @@
   --surface-muted: #f8f3ea;
   --ink: #1f1811;
   --ink-soft: #5d4f42;
-  --ink-muted: #7a6a5b;
+  /* Darkened from #7a6a5b, which measured 4.44:1 on --page-elevated and
+     4.46:1 on --brand-soft — under AA by a hair, and invisible to the eye.
+     Caught by tests/e2e/accessibility.spec.ts. */
+  --ink-muted: #756453;
   --line: #e7dbc9;
   --line-strong: #d6c6ae;
 
@@ -34,7 +37,10 @@
   --accent: #2f6b4f;
   --accent-soft: #e6f1ea;
 
-  --gold: #a9781f;
+  /* Darkened from #a9781f, which failed AA on every light surface
+     (3.32–3.89:1) — most visibly as the "featured" badge, gold on
+     gold-soft at 3.47:1. Now 4.81:1 at worst. */
+  --gold: #8a5f12;
   --gold-soft: #fbf1dc;
 
   --danger: #b3261e;

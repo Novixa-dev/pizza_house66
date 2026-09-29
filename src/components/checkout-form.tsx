@@ -289,7 +289,14 @@ export function CheckoutForm({
     <form onSubmit={handleSubmit} noValidate className="container-page py-10">
       <SectionHeading level={1} title={t.checkout.title} />
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_22rem] lg:items-start">
+      {/* `[&>*]:min-w-0` is load-bearing. Grid items default to
+          `min-width: auto`, so a child refuses to shrink below its
+          min-content width — the order summary's price rows were forcing
+          this grid to 539px inside a 382px column, pushing the whole
+          checkout page into horizontal scroll on a phone and shifting the
+          pickup-slot buttons out from under the user's thumb.
+          Caught by tests/e2e/customer-ordering.spec.ts. */}
+      <div className="grid gap-8 [&>*]:min-w-0 lg:grid-cols-[1fr_22rem] lg:items-start">
         <div className="space-y-6">
           {/* ------------------------------------------------ Contact ---- */}
           <Card className="p-5">

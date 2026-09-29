@@ -170,7 +170,14 @@ export function KitchenBoard({
               return (
                 <li
                   key={order.id}
-                  className="w-56 shrink-0 rounded-[var(--radius)] border border-line bg-surface p-3 opacity-85"
+                  // A recessed surface rather than `opacity-85`: container
+                  // opacity composites every descendant toward the page
+                  // behind it, which quietly drops the text inside below AA
+                  // contrast however carefully the tokens are chosen. A
+                  // muted background reads the same and stays measurable.
+                  // Caught by tests/e2e/accessibility.spec.ts, which only
+                  // sees this lane once scheduled orders exist.
+                  className="w-56 shrink-0 rounded-[var(--radius)] border border-line bg-surface-muted p-3"
                 >
                   <div className="mb-1 flex items-baseline justify-between">
                     <span className="numeric font-extrabold text-ink">{order.reference}</span>

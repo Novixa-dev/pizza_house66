@@ -60,7 +60,8 @@ export function CartView({
     <div className="container-page py-10">
       <SectionHeading level={1} title={t.cart.title} />
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_22rem] lg:items-start">
+      {/* See checkout-form.tsx — same grid, same min-width: auto trap. */}
+      <div className="grid gap-8 [&>*]:min-w-0 lg:grid-cols-[1fr_22rem] lg:items-start">
         <ul className="space-y-3">
           {items.map((item) => (
             <Card as="li" key={item.cartLineId} className="p-4">
