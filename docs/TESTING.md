@@ -4,16 +4,16 @@ Three suites, each answering a different question.
 
 | Suite | Question | Tests | Command |
 |---|---|---|---|
-| Unit | Are the rules correct? | 84 | `npm test` |
+| Unit | Are the rules correct? | 88 | `npm test` |
 | Integration | Does the database agree? | 24 | `npm run test:integration` |
-| End-to-end | Does a person get through it? | 48 | `npm run test:e2e` |
+| End-to-end | Does a person get through it? | 92 | `npm run test:e2e` |
 
 All green, along with `npm run lint`, `npm run typecheck` and `npm run build`.
 `npm run verify` chains the first four.
 
 ---
 
-## Unit — `tests/unit/` (84)
+## Unit — `tests/unit/` (88)
 
 Everything in `src/lib` is pure and takes the clock as a parameter, which is
 exactly what makes the rules that most need to be *right* testable to the
@@ -27,7 +27,10 @@ closing times and dated overrides. `validatePickupTime` across all six reason
 codes. Slot generation and snapping, including the quarter-hour boundaries
 where an off-by-one would quietly move every slot.
 
-**`time.test.ts` (15)** — the timezone layer. Wall-clock ↔ instant
+**`time.test.ts` (19)** — the timezone layer, and the digit-rendering rule:
+Arabic dates and times must use Western-Arabic digits, because `formatMoney`
+does and two digit systems in one order row is what shipped before anyone
+checked. Wall-clock ↔ instant
 conversion, `Intl` offset lookup, start-of-day in a zone, `HH:mm`
 parse/format round-trips, and a DST boundary in a zone that has one (Asia/Aden
 does not, which is precisely why the test uses one that does — a layer that
@@ -81,9 +84,9 @@ data and its slot capacity, so parallel files would fight over it.
 
 ---
 
-## End-to-end — `tests/e2e/` (48)
+## End-to-end — `tests/e2e/` (92)
 
-Playwright, against a **real production build** with a real database. 24 test
+Playwright, against a **real production build** with a real database. 46 test
 definitions run in two projects: `mobile-ar` (Pixel 7, `ar-YE`, RTL) and
 `desktop-en` (Desktop Chrome, `en-GB`, LTR). Arabic on a phone is the primary
 way this restaurant's customers will actually use the site, so it is the
@@ -100,6 +103,20 @@ language switch; ASAP and scheduled pickup; a promo code applied at checkout.
 lands; the permission boundaries; the kitchen board's three lanes and its
 transitions; the anonymous-access refusals; the cron endpoint's 401; the
 client-submitted-price rejection; the hardening headers.
+
+**`accessibility.spec.ts` (22)** — axe-core against WCAG 2.1 A and AA on
+seven pages in light mode and four in dark; the specific commitments in
+`docs/DESIGN-SYSTEM.md` (`lang` and `dir` agree, every checkout field is
+programmatically labelled, focus is never suppressed, one `h1` per page);
+and horizontal-overflow assertions at 414px across the customer and staff
+screens.
+
+This suite is not decoration — adding it found three real bugs on its first
+run: `--gold` failing AA on every light surface, `opacity-85` on the kitchen's
+scheduled lane dropping the text inside below AA, and checkout rendering
+555px of content in a 414px viewport, which pushed the pickup-slot buttons
+partly off-screen. A failure names the rule and the offending selector, so it
+says what to fix rather than that "accessibility broke".
 
 ### Running it
 
@@ -133,10 +150,11 @@ events" — an error that points nowhere near the actual cause.
 
 Stated rather than implied:
 
-- **No accessibility assertions.** Semantic HTML, focus states, labels and
-  AA contrast are built in and were checked by hand (`docs/QA-CHECKLIST.md`),
-  but nothing fails a build if a future change breaks them. An `axe-core`
-  pass in the Playwright suite is the obvious next addition.
+- **Accessibility is automated but not exhaustive.** axe-core catches roughly
+  a third to a half of WCAG issues; it cannot judge whether alt text is
+  *meaningful*, whether a reading order makes sense, or whether an
+  interaction works with a real screen reader. The manual pass in
+  `docs/QA-CHECKLIST.md` still matters.
 - **No visual regression testing.** A CSS change that breaks a layout is
   caught by a human or not at all.
 - **No load testing.** Slot capacity is tested for correctness under

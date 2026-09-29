@@ -121,9 +121,9 @@ Full setup, including a local Postgres in one command, is in
 
 | Suite | Count | Command |
 |---|---|---|
-| Unit | 84 | `npm test` |
+| Unit | 88 | `npm test` |
 | Integration | 24 | `npm run test:integration` |
-| End-to-end | 48 | `npm run test:e2e` |
+| End-to-end | 92 | `npm run test:e2e` |
 
 All passing, with lint, typecheck and build clean. What each suite covers —
 and what it deliberately does not — is in `docs/TESTING.md`.

@@ -91,12 +91,12 @@ This is a demonstration deployment carrying the illustrative menu from
 
 | Item | Status |
 |---|---|
-| Unit tests (84) | ✅ |
+| Unit tests (88) | ✅ |
 | Integration tests (24) | ✅ |
-| E2E tests (48, two viewports/languages) | ✅ |
+| E2E tests (92, two viewports/languages) | ✅ |
 | Lint, typecheck, build | ✅ clean |
 | CI pipeline | ✅ `.github/workflows/ci.yml` |
-| Accessibility | ⚠️ Built in and checked by hand; not asserted in CI |
+| Accessibility | ✅ axe-core WCAG 2.1 A/AA in CI, light and dark, plus no-horizontal-overflow at phone width |
 | Visual regression | ⬜ |
 | Load testing | ⬜ |
 | Dependency scanning in CI | ⬜ `npm audit` is manual |
@@ -142,7 +142,5 @@ In the order I would do it:
    only delivery is missing. In Yemen this is the channel customers actually
    read.
 3. **Printable kitchen tickets**, if the restaurant has a printer.
-4. **`axe-core` in the Playwright suite**, so accessibility cannot regress
-   silently.
-5. **Shared-store rate limiting**, before the deployment ever scales past one
+4. **Shared-store rate limiting**, before the deployment ever scales past one
    instance.

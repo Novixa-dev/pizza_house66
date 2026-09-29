@@ -30,11 +30,28 @@ The palette is food-first: tomato, basil, warm gold, an oven-warm neutral
 ground. No blue-grey SaaS dashboard, no black-on-white minimalism — this is a
 restaurant.
 
-**Every text pair meets WCAG AA at its rendered size, in both schemes.** Dark
-mode is a full re-declaration of the same token names under
-`prefers-color-scheme: dark`, not an inversion filter — the brand red lightens
-to `#e8685a` because the dark-mode original would fail contrast on a dark
-ground.
+**Every text pair meets WCAG AA at its rendered size, in both schemes**, and
+`tests/e2e/accessibility.spec.ts` is what holds that to being true rather
+than aspirational — it was written because the claim was false: `--gold`
+measured 3.32–3.89:1 on light surfaces until it was darkened. Dark mode is a
+full re-declaration of the same token names under
+`prefers-color-scheme: dark`, not an inversion filter — the brand red
+lightens to `#e8685a` because the dark-mode original would fail contrast on
+a dark ground.
+
+**Never use container `opacity` to recede a block of text.** It composites
+every descendant toward whatever is behind it, so the rendered contrast
+falls below AA however carefully the tokens are chosen, and no amount of
+token maths will reveal it. Use a recessed surface (`bg-surface-muted`)
+instead. The kitchen's scheduled lane shipped with `opacity-85` and failed
+for exactly this reason.
+
+**Grid and flex children need `min-w-0`.** They default to
+`min-width: auto`, so a child refuses to shrink below its min-content width
+and pushes the page wider than the viewport. Checkout rendered 555px of
+content in a 414px screen this way, sliding the pickup-slot buttons partly
+off-screen. There is a test at phone width for every customer and staff
+page.
 
 ### Shape, depth, spacing
 
