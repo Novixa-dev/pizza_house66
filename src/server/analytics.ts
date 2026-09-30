@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
+import { foldFunnel, type FunnelCounts } from "@/lib/funnel";
 
 // First-party analytics (docs/PRD.md §52, §53).
 //
@@ -61,46 +62,20 @@ export async function track(input: TrackInput): Promise<void> {
   }
 }
 
-export interface FunnelCounts {
-  visitors: number;
-  menuViews: number;
-  productViews: number;
-  addToCart: number;
-  checkoutStarted: number;
-  orders: number;
-}
+export type { FunnelCounts };
 
 /**
- * The funnel from docs/PRD.md §53. Counts distinct sessions at each step
- * rather than raw events, so one indecisive visitor refreshing the menu
- * twenty times doesn't read as twenty people.
+ * The funnel from docs/PRD.md §53. Counts distinct sessions rather than raw
+ * events, so one indecisive visitor refreshing the menu twenty times does not
+ * read as twenty people. The folding rule — and why it counts sessions that
+ * reached *at least* each step — lives in `src/lib/funnel.ts`.
  */
 export async function getFunnel(since: Date, until: Date): Promise<FunnelCounts> {
   const rows = await prisma.analyticsEvent.findMany({
     where: { createdAt: { gte: since, lte: until } },
     select: { name: true, sessionId: true },
   });
-
-  const bucket = new Map<string, Set<string>>();
-  let anonymousOrders = 0;
-  for (const row of rows) {
-    if (!row.sessionId) {
-      if (row.name === "order_created") anonymousOrders += 1;
-      continue;
-    }
-    if (!bucket.has(row.name)) bucket.set(row.name, new Set());
-    bucket.get(row.name)!.add(row.sessionId);
-  }
-  const count = (name: string) => bucket.get(name)?.size ?? 0;
-
-  return {
-    visitors: count("page_view"),
-    menuViews: count("menu_view"),
-    productViews: count("product_view"),
-    addToCart: count("add_to_cart"),
-    checkoutStarted: count("checkout_started"),
-    orders: count("order_created") + anonymousOrders,
-  };
+  return foldFunnel(rows);
 }
 
 export async function countEventsByName(since: Date, until: Date) {
