@@ -507,7 +507,7 @@ platform-specific. Deeper: `docs/DEPLOYMENT.md`, `docs/ENVIRONMENT.md`.
 | SEO, analytics, PWA | Structured data, sitemap, funnel, manifest |
 | Documentation | 24 documents, rewritten from the code |
 | CI | Three-job workflow, deduplicated per commit |
-| Deployment | Live on Railway with a post-deploy smoke check |
+| Deployment | Live on Railway with a post-deploy smoke check and a startup wait for the database |
 | Accessibility | axe-core in CI; three real defects found and fixed |
 | Review | Screen-by-screen design and UX pass against the running app: 17 defects found and fixed, 248 tests green |
 
@@ -585,6 +585,7 @@ it — not by reading the code. They are listed because the lesson is reusable.
 | Three footer links 18px tall in English, 24px in Arabic | They cleared the floor only because `[dir="rtl"]` sets line-height 1.75. Accessible in one language and not the other is not accessible |
 | Half the activity log in English | A log the owner cannot read is not an audit trail |
 | Payment instructions in a single-line input | The owner could only see the first few words of a sentence the customer reads at checkout |
+| A deploy crash-looped on `P1001` while the database was healthy | A container is up before the private network is. Wait for the dependency; do not race it, and do not wrap the migration itself in the retry |
 
 Three patterns run through the list. **Anything that depends on the
 environment** — clock, protocol, origin, Node version, timezone, locale —

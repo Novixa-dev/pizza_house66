@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "npm run db:migrate && npm run db:seed && npm start",
+    "startCommand": "node scripts/wait-for-db.mjs && npm run db:migrate && npm run db:seed && npm start",
     "healthcheckPath": "/",
     "healthcheckTimeout": 180,
     "restartPolicyType": "ON_FAILURE",
