@@ -7,9 +7,10 @@ import { getLocale, pick } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { describeDuration } from "@/lib/duration";
 import { getRestaurant } from "@/server/restaurant";
+import { productImageUrl } from "@/lib/product-image";
 import { absoluteUrl } from "@/lib/site";
 import { Alert, Badge, ButtonLink } from "@/components/ui";
-import { AlertIcon, ArrowLeftIcon, ClockIcon, PizzaIcon } from "@/components/ui/icons";
+import { AlertIcon, ArrowLeftIcon, ClockIcon } from "@/components/ui/icons";
 import { ProductCustomizer } from "@/components/product-customizer";
 import { ProductCard } from "@/components/product-card";
 
@@ -20,6 +21,7 @@ async function loadProduct(slug: string) {
     where: { slug },
     include: {
       category: true,
+      image: { select: { version: true } },
       optionGroups: {
         orderBy: { sortOrder: "asc" },
         include: { values: { orderBy: { sortOrder: "asc" } } },
@@ -43,7 +45,7 @@ export async function generateMetadata({ params }: PageProps<"/product/[slug]">)
       title: name,
       description,
       url: absoluteUrl(`/product/${product.slug}`),
-      images: product.imageUrl ? [{ url: product.imageUrl }] : undefined,
+      images: [{ url: absoluteUrl(productImageUrl(product)) }],
     },
   };
 }
@@ -69,6 +71,7 @@ export default async function ProductPage({ params }: PageProps<"/product/[slug]
     },
     orderBy: { sortOrder: "asc" },
     take: 4,
+    include: { image: { select: { version: true } } },
   });
 
   return (
@@ -86,7 +89,7 @@ export default async function ProductPage({ params }: PageProps<"/product/[slug]
       <ProductJsonLd
         name={name}
         description={description}
-        image={product.imageUrl}
+        image={absoluteUrl(productImageUrl(product))}
         priceMinor={product.basePriceMinor}
         currency={restaurant.currency}
         available={!soldOut}
@@ -96,20 +99,17 @@ export default async function ProductPage({ params }: PageProps<"/product/[slug]
       <div className="grid gap-8 lg:grid-cols-2">
         <div>
           <div className="relative aspect-square overflow-hidden rounded-[var(--radius-lg)] border border-line bg-page-elevated">
-            {product.imageUrl ? (
-              <Image
-                src={product.imageUrl}
-                alt={name}
-                fill
-                priority
-                sizes="(max-width: 1024px) 100vw, 520px"
-                className={`object-cover ${soldOut ? "opacity-60 grayscale" : ""}`}
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-6xl text-ink-muted">
-                <PizzaIcon />
-              </div>
-            )}
+            <Image
+              src={productImageUrl(product)}
+              alt={name}
+              fill
+              priority
+              sizes="(max-width: 1024px) 100vw, 520px"
+              className={`object-cover ${soldOut ? "opacity-60 grayscale" : ""}`}
+              // An uploaded photo is served by a route rather than a file in
+              // /public, so the optimizer has nothing to read at build time.
+              unoptimized={Boolean(product.image)}
+            />
           </div>
         </div>
 
@@ -151,7 +151,7 @@ export default async function ProductPage({ params }: PageProps<"/product/[slug]
                   slug: product.slug,
                   nameAr: product.nameAr,
                   nameEn: product.nameEn,
-                  imageUrl: product.imageUrl,
+                  imageUrl: productImageUrl(product),
                   basePriceMinor: product.basePriceMinor,
                   optionGroups: product.optionGroups.map((group) => ({
                     id: group.id,

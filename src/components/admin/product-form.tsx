@@ -138,7 +138,12 @@ export function ProductForm({
                 defaultValue={product?.sortOrder ?? 0}
               />
             </Field>
-            <Field label={t.products.imageUrl} htmlFor="imageUrl" className="sm:col-span-2">
+            <Field
+              label={t.products.imageUrl}
+              htmlFor="imageUrl"
+              hint={t.products.imageUrlHint}
+              className="sm:col-span-2"
+            >
               <Input
                 id="imageUrl"
                 name="imageUrl"

@@ -4,7 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 import { DEFAULT_SESSIONS, SESSIONS_PER_DAY } from "@/lib/business-hours";
+import { PRODUCT_IMAGE_MAX_BYTES, PRODUCT_IMAGE_TYPES } from "@/lib/product-image";
+import { sanitizeFilename, sniffImageType } from "./order-schema";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
 import { ForbiddenError } from "@/lib/permissions";
@@ -207,6 +210,79 @@ const productSchema = z.object({
     .union([z.literal(""), z.coerce.number().int().min(1).max(240)])
     .transform((value) => (value === "" ? null : value)),
 });
+
+/**
+ * Stores a photograph the restaurant took of their own food.
+ *
+ * Separate from saving the product so the owner can change a photo without
+ * re-submitting the whole form, and so a 3MB upload does not ride along with
+ * every price edit. The file is sniffed rather than trusted: a browser's
+ * declared content type is a hint, and an HTML file renamed to .jpg served
+ * back with `Content-Type: image/jpeg` is a stored-XSS if the sniff is
+ * skipped and a browser guesses (docs/PRD.md §42).
+ */
+export async function uploadProductImageAction(form: FormData): Promise<ActionState> {
+  return run(async () => {
+    const actor = await auditor("products.update");
+    const productId = text(form, "productId");
+    if (!productId) throw new Error("missing_product");
+
+    const file = form.get("image");
+    if (!(file instanceof File) || file.size === 0) throw new Error("no_file");
+    if (file.size > PRODUCT_IMAGE_MAX_BYTES) throw new Error("image_too_large");
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const sniffed = sniffImageType(buffer);
+    if (!sniffed || !(PRODUCT_IMAGE_TYPES as readonly string[]).includes(sniffed)) {
+      throw new Error("image_type");
+    }
+
+    const product = await prisma.product.findUniqueOrThrow({
+      where: { id: productId },
+      select: { slug: true },
+    });
+
+    const data = {
+      contentType: sniffed,
+      byteSize: buffer.byteLength,
+      data: new Uint8Array(buffer),
+      // A fresh version on every upload, so the immutable cache on the
+      // serving route can never hand back the photo this one replaced.
+      version: randomUUID(),
+      originalName: sanitizeFilename(file.name),
+    };
+    await prisma.productImage.upsert({
+      where: { productId },
+      create: { productId, ...data },
+      update: data,
+    });
+
+    await audit(actor, "product.update", "Product", productId, {
+      image: { uploaded: true, bytes: buffer.byteLength, type: sniffed },
+    });
+    revalidateAdmin(`/admin/products/${productId}`, "/menu", `/product/${product.slug}`);
+    return {};
+  });
+}
+
+/** Removes an uploaded photograph, falling back to the URL or the placeholder. */
+export async function deleteProductImageAction(form: FormData): Promise<ActionState> {
+  return run(async () => {
+    const actor = await auditor("products.update");
+    const productId = text(form, "productId");
+    if (!productId) throw new Error("missing_product");
+
+    const product = await prisma.product.findUniqueOrThrow({
+      where: { id: productId },
+      select: { slug: true },
+    });
+    await prisma.productImage.deleteMany({ where: { productId } });
+
+    await audit(actor, "product.update", "Product", productId, { image: { removed: true } });
+    revalidateAdmin(`/admin/products/${productId}`, "/menu", `/product/${product.slug}`);
+    return {};
+  });
+}
 
 export async function saveProductAction(form: FormData): Promise<ActionState> {
   return run(async () => {

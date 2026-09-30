@@ -3,10 +3,11 @@ import Image from "next/image";
 import type { Product } from "@prisma/client";
 import type { Locale } from "@/lib/i18n/dictionaries";
 import { getDictionary } from "@/lib/i18n/dictionaries";
+import { FALLBACK_IMAGE } from "@/lib/product-image";
 import { pick } from "@/lib/i18n/pick";
 import { formatMoney } from "@/lib/money";
 import { Badge } from "./ui";
-import { PizzaIcon } from "./ui/icons";
+
 
 type BadgeKey = keyof ReturnType<typeof getDictionary>["badges"];
 
@@ -47,19 +48,18 @@ export function ProductCard({
 
   const media = (
     <div className="relative aspect-4/3 overflow-hidden rounded-[var(--radius-sm)] bg-page-elevated">
-      {product.imageUrl ? (
-        <Image
-          src={product.imageUrl}
-          alt={name}
-          fill
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 260px"
-          className={`object-cover ${soldOut ? "opacity-55 grayscale" : ""}`}
-        />
-      ) : (
-        <div className="flex h-full items-center justify-center text-3xl text-ink-muted">
-          <PizzaIcon />
-        </div>
-      )}
+      <Image
+        src={product.imageUrl ?? FALLBACK_IMAGE}
+        alt={name}
+        fill
+        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 260px"
+        className={`object-cover transition-transform duration-500 group-hover:scale-105 ${
+          soldOut ? "opacity-55 grayscale" : ""
+        }`}
+        // A photo the restaurant uploaded is served by an API route, which
+        // the build-time optimizer cannot read.
+        unoptimized={product.imageUrl?.startsWith("/api/product-images/") ?? false}
+      />
       {badgeKey && !soldOut ? (
         <span className="absolute start-2 top-2">
           <Badge tone={BADGE_TONE[badgeKey] ?? "neutral"}>{t.badges[badgeKey]}</Badge>

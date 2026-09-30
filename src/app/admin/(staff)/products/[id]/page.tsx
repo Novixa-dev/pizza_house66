@@ -16,6 +16,7 @@ import {
 import { Card, Checkbox, Field, Input, SectionHeading } from "@/components/ui";
 import { ArrowLeftIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
 import { ProductForm } from "@/components/admin/product-form";
+import { ProductImageField } from "@/components/admin/product-image-field";
 import { SubmitButton } from "@/components/admin/submit-button";
 import { AdminForm } from "@/components/admin/admin-form";
 
@@ -33,6 +34,7 @@ export default async function EditProductPage({ params }: PageProps<"/admin/prod
     prisma.product.findUnique({
       where: { id },
       include: {
+        image: { select: { version: true } },
         optionGroups: {
           orderBy: { sortOrder: "asc" },
           include: { values: { orderBy: { sortOrder: "asc" } } },
@@ -61,6 +63,8 @@ export default async function EditProductPage({ params }: PageProps<"/admin/prod
         title={pick(locale, product.nameAr, product.nameEn)}
         subtitle={t.products.editProduct}
       />
+
+      <ProductImageField locale={locale} product={product} />
 
       <ProductForm
         locale={locale}

@@ -218,6 +218,9 @@ model Product {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// An uploaded photograph, which takes precedence over `imageUrl`.
+  image ProductImage?
+
   optionGroups ProductOptionGroup[]
   orderItems   OrderItem[]
   promotions   PromotionProduct[]
@@ -548,6 +551,30 @@ model Payment {
 // that access always goes through an authorization check instead of a
 // guessable public URL (docs/PRD.md §42). See docs/DECISIONS.md for the
 // object-storage migration path once volume justifies it.
+/// A photograph of a menu item, uploaded by the restaurant.
+///
+/// The point of this table is that the owner can photograph their own food
+/// and put it on the site without a developer, a deploy, or an account with
+/// an image host. Stock photography of somebody else's pizza is a stand-in,
+/// and every restaurant that can replace it, should.
+///
+/// Stored as bytes beside the receipts rather than on disk: the container's
+/// filesystem is ephemeral on this host, so a file written at runtime is
+/// gone at the next deploy. One database, one backup, nothing to re-upload.
+model ProductImage {
+  id          String  @id @default(cuid())
+  productId   String  @unique
+  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  contentType String
+  byteSize    Int
+  data        Bytes
+  /// Changes on every upload, and rides in the URL, so a replaced photo is
+  /// not served from a cache that still holds the old one.
+  version     String  @default(cuid())
+  originalName String? // sanitized; never used to build a filesystem path
+  uploadedAt  DateTime @default(now())
+}
+
 model PaymentReceipt {
   id           String   @id @default(cuid())
   paymentId    String   @unique

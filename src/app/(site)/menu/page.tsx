@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getLocale, pick } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getRestaurant } from "@/server/restaurant";
+import { productImageUrl } from "@/lib/product-image";
 import { SectionHeading, Alert } from "@/components/ui";
 import { AlertIcon } from "@/components/ui/icons";
 import { MenuBrowser } from "@/components/menu-browser";
@@ -35,6 +36,7 @@ export default async function MenuPage() {
         // stay listed so people can see the item exists (docs/PRD.md §17).
         where: { availability: { not: "HIDDEN" } },
         orderBy: { sortOrder: "asc" },
+        include: { image: { select: { version: true } } },
       },
     },
   });
@@ -70,7 +72,7 @@ export default async function MenuPage() {
             nameEn: product.nameEn,
             descriptionAr: product.descriptionAr,
             descriptionEn: product.descriptionEn,
-            imageUrl: product.imageUrl,
+            imageUrl: productImageUrl(product),
             basePriceMinor: product.basePriceMinor,
             availability: product.availability,
             badge: product.badge,
