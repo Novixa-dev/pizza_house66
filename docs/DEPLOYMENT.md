@@ -186,6 +186,30 @@ CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
 Set `output: "standalone"` in `next.config.ts` first if you want a smaller
 image; the app does not otherwise care.
 
+## GitHub Actions is blocked on this account
+
+**Nothing in CI has ever actually run.** Every one of the 55 workflow runs
+failed two to three seconds after being created, with no logs to fetch — the
+log endpoint returns 404 because there is no log: the runner never started.
+That is not a failing test and no change to the workflow files can fix it.
+
+It is an account-level block on a **private** repository. Either the
+organization has no GitHub Actions minutes left, or Actions is restricted for
+private repositories on its plan. Two ways out:
+
+- **Make the repository public.** Actions is unmetered on public repositories,
+  and this is the fastest fix. Check first that nothing secret is committed —
+  it is not: every credential is an environment variable, and the seed's
+  staff password comes from `SEED_STAFF_PASSWORD`.
+- **Add Actions minutes** to the organization, under GitHub → the
+  organization → Settings → Billing.
+
+Until then the deploy gate below can never pass, because it waits for checks
+that never run. Deploy by hand — either `workflow_dispatch` with
+`skip_ci_gate`, or `railway up` locally — and run `npm run typecheck && npm
+run lint && npm test && npm run test:integration` before you do, since that is
+exactly what CI would have run.
+
 ## Automatic deployment
 
 `.github/workflows/deploy.yml` ships `main` to Railway **after** CI has passed
