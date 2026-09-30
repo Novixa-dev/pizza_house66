@@ -151,6 +151,10 @@ system.
 ## Documentation
 
 **Start here**
+- **`PROJECT-HANDBOOK.md` — everything in one file.** The product, the stack,
+  the rules, the design system, testing, workflows, deployment, progress,
+  what is blocked and what is planned. Read this first; every other document
+  goes deeper on one section of it.
 - `docs/PROJECT-STATUS.md` — what is done, what is not, in one table
 - `docs/HANDOVER.md` — everything the owner must do to go live
 - `docs/ARCHITECTURE.md` — module layout and the request flow that matters
