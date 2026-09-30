@@ -192,7 +192,11 @@ never `role === "MANAGER"`. Adding a role is one line in one table.
 **4. Money is integer minor units.** No floats, anywhere, ever.
 
 **5. Wall-clock time goes through `src/lib/time.ts`.** Nothing else calls
-`setHours` or `getDay`. "16:00" means 16:00 in the restaurant's zone.
+`setHours` or `getDay`. "16:00" means 16:00 in the restaurant's zone — and
+so does a bare `"2026-01-05"` off a date input, which `new Date()` would
+otherwise read as midnight UTC. `startOfDateInput` / `endOfDateInput` /
+`toDateInputValue` are the round-trip; an end date covers the whole of its
+day, because an offer advertised until a date is good through it.
 
 **6. Order lines snapshot what was bought.** A price rise on Thursday never
 rewrites Tuesday's receipt.
@@ -211,6 +215,15 @@ it — which once presented as staff login silently doing nothing.
 **10. The UI hiding a control is not security.** Every Server Action
 re-checks, because a Server Action is a POST endpoint anyone can read from
 the page source.
+
+**11. A reported number names the table it came from.** The orders table is
+the authority on how many orders exist; the analytics table is a lossy
+signal about journeys, and `AnalyticsEvent.orderId` is deliberately not a
+foreign key so history survives a deletion. A chart that mixes the two
+produces a funnel wider at the bottom than the top — which it did, twice.
+`foldFunnel` in `src/lib/funnel.ts` counts sessions that reached *at least*
+each step and nothing else, so it is monotonic for any input; the true order
+count is read straight from the orders table beside it.
 
 ---
 
@@ -264,7 +277,7 @@ Three rules they all follow:
    and wiring `aria-describedby`/`aria-invalid` — so accessible markup is the
    path of least resistance.
 
-### The five style rules that are load-bearing
+### The seven style rules that are load-bearing
 
 These are not preferences. Each one was a bug first.
 
@@ -292,6 +305,23 @@ sliding the pickup-slot buttons partly off-screen.
 wherever it matches the surface — a brand ring on the brand-coloured skip
 link measured exactly 1.00:1. `--focus-ring` plus a `--focus-halo` box-shadow
 guarantees one of the two always contrasts.
+
+**Every target gets an explicit 24px floor.** A bare text link's hit box is
+whatever its line box happens to be, which is 18px at `text-sm` in English.
+Three footer links cleared the WCAG 2.2 floor (SC 2.5.8) only because
+`[dir="rtl"]` sets line-height 1.75 — accessible in Arabic and not in
+English, from the same markup. Give an interactive element `min-h-6` with
+centred content rather than inheriting a size by accident. Asserted for
+every link, button, input and select in `tests/e2e/accessibility.spec.ts`.
+
+**Numbers a person reads go through `Intl`, never through concatenation.**
+Money, times, dates and durations each have a formatter, and all four pin
+the numbering system to Western digits so one order row does not show ٤٥
+beside 2,200. Arabic is why this is load-bearing rather than tidy: دقيقة,
+دقيقتان, ٣ دقائق and ١١ دقيقة are four forms of one word selected by the
+number in front of it, so `${n} ${word}` is wrong for most values of `n`.
+`describeDuration` in `src/lib/duration.ts` is the entry point for elapsed
+and remaining times.
 
 ### Arabic typography
 
@@ -334,9 +364,9 @@ Deeper: `docs/DESIGN-SYSTEM.md`, `docs/LOCALIZATION.md`.
 
 | Suite | Question it answers | Count | Command |
 |---|---|---|---|
-| Unit | Are the rules correct? | 88 | `npm test` |
-| Integration | Does the database agree? | 24 | `npm run test:integration` |
-| End-to-end | Does a person get through it? | 96 | `npm run test:e2e` |
+| Unit | Are the rules correct? | 118 | `npm test` |
+| Integration | Does the database agree? | 28 | `npm run test:integration` |
+| End-to-end | Does a person get through it? | 102 | `npm run test:e2e` |
 | Smoke | Is a deployment serving and still private? | 19 | `npm run smoke -- <url>` |
 
 `npm run verify` chains typecheck → lint → unit → build.
@@ -354,8 +384,9 @@ release.
 **End-to-end** runs against a real production build in two projects —
 `mobile-ar` (Pixel 7, Arabic, RTL) and `desktop-en` — with the timezone
 pinned to `Asia/Aden`. Covers the customer journey, the staff journey, the
-security boundaries, WCAG 2.1 A/AA via axe-core in light and dark, and
-horizontal-overflow assertions at phone width.
+security boundaries, WCAG 2.1 A/AA via axe-core in light and dark,
+horizontal-overflow assertions at phone width, and the rendered size of
+every interactive target against the 24px floor of WCAG 2.2 SC 2.5.8.
 
 **What automated tests cannot do:** axe-core catches perhaps a third to a
 half of WCAG issues and cannot judge whether alt text is meaningful or a
@@ -478,9 +509,41 @@ platform-specific. Deeper: `docs/DEPLOYMENT.md`, `docs/ENVIRONMENT.md`.
 | CI | Three-job workflow, deduplicated per commit |
 | Deployment | Live on Railway with a post-deploy smoke check |
 | Accessibility | axe-core in CI; three real defects found and fixed |
-| Review | Design and UX pass against the running app |
+| Review | Screen-by-screen design and UX pass against the running app: 17 defects found and fixed, 248 tests green |
 
 `docs/ROADMAP.md` maps this onto the PRD's phases.
+
+---
+
+### Review pass: every screen, as its user
+
+A second pass over the built application, screen by screen, reading each one
+as the person who has to use it rather than as the person who wrote it. The
+customer side was walked at 414px in Arabic and at 1440px in English; the
+staff side as an owner, a cashier and a kitchen account.
+
+Seventeen defects came out of it, all listed in the table below. The ones
+worth naming separately:
+
+- The **conversion funnel** was not a funnel. It took two fixes: the first
+  established that lossy browser beacons and reliable server writes cannot
+  be counted the same way, and the second that a chart's unit has to be one
+  thing.
+- The **dashboard reported an idle restaurant** while ten orders sat
+  unstarted in the kitchen queue.
+- A **promotion expired 21 hours early** in the restaurant's own timezone.
+- The **kitchen board** showed "متأخر 6862" on the screen that most needs to
+  be readable at a glance.
+
+An external accessibility scan of the deployment arrived during the pass and
+was worth exactly one of its five findings. Its touch-target report was real
+and understated — measuring every element found seven failures where it
+reported three. Its two focus-indicator findings were false positives from
+using a programmatic `.focus()`, which does not match `:focus-visible` on a
+link or a button; all 22 keyboard stops carry a ring and a halo when tabbed
+to. Its `alt=""` finding was wrong on the standard: that is how an image is
+marked decorative. **A scanner's finding is a lead, not a verdict** — each
+one is worth the measurement it takes to confirm.
 
 ---
 
@@ -507,11 +570,36 @@ it — not by reading the code. They are listed because the lesson is reusable.
 | Checkout 555px wide in a 414px viewport | Grid children need `min-w-0`; the slot buttons slid off-screen |
 | Focus ring 1.00:1 on the skip link | A single ring colour is invisible somewhere. Two-tone or nothing |
 | ASAP promised "~20 minutes" while closed | A constant in the UI made a promise the server would not keep |
+| Conversion funnel grew as it descended | Two halves collected differently — lossy browser beacons on top, server writes at the bottom — cannot be counted the same way |
+| A funnel of sessions holding un-sessioned orders | The second attempt at the above. A chart's unit has to be one thing; orders without a session belong to the orders table, not to a funnel of journeys |
+| 377 recorded orders against 16 real ones | `AnalyticsEvent.orderId` is deliberately not a foreign key, so events outlive orders. Right for production history, a slow leak in a database that is wiped and refilled |
+| "Nothing needs attention" while ten orders sat unstarted | An attention queue is only as good as the states it knows to watch. `QUEUED` is where waiting is pure lost time, and it was the one state unwatched |
+| The tile row read all zeros while the kitchen was behind | It counted `PREPARING` and not `QUEUED` |
+| Customer count was the page size | `take: 100` then `array.length` as the total. A capped list is not a count |
+| A promotion ended 21 hours early | `new Date("2026-01-05")` is midnight **UTC** — the one case where JS date parsing is not local. A calendar date only means something inside a timezone |
+| A button labelled "Sold out" beside a badge labelled "Available" | Name a control for what it does, never for a state — most of all the one used mid-service |
+| Eighteen identical "Mark sold out" buttons | A screen reader hears a list of controls out of the context of the row they sit in |
+| "متأخر 6862" on the kitchen board | Four digits and no unit, on the screen read at a glance from across a room |
+| "3 دقيقة" for a three-minute prep time | Arabic has four forms of that word chosen by the number in front of it. `Intl.NumberFormat` knows them; concatenation never will |
+| "16 الطلبات" | A number in Arabic is not followed by the definite article |
+| Three footer links 18px tall in English, 24px in Arabic | They cleared the floor only because `[dir="rtl"]` sets line-height 1.75. Accessible in one language and not the other is not accessible |
+| Half the activity log in English | A log the owner cannot read is not an audit trail |
+| Payment instructions in a single-line input | The owner could only see the first few words of a sentence the customer reads at checkout |
 
-Two patterns run through the list: **anything that depends on the
-environment** (clock, protocol, origin, Node version) needs to be read from
-the environment rather than assumed, and **anything the design system claims**
-needs a test or it quietly stops being true.
+Three patterns run through the list. **Anything that depends on the
+environment** — clock, protocol, origin, Node version, timezone, locale —
+needs to be read from the environment rather than assumed. **Anything the
+design system claims** needs a test or it quietly stops being true. And
+**any number shown to a person** needs to be traced to the table it came
+from: the funnel, the customer count and the order tiles were each wrong in
+a way that looked plausible until the two numbers on the same screen were
+compared.
+
+A fourth, learned the hard way on the funnel: when a fix produces the same
+symptom by a different route, the model is wrong, not the arithmetic. The
+first funnel fix was correct about *why* the data disagreed and still built
+a chart that bulged at the bottom, because it kept mixing two units in one
+column.
 
 ---
 
@@ -543,6 +631,11 @@ Pizza House value.
   since Actions is free and unmetered there.
 - **The build container's network policy denies the deployment host**, so the
   smoke check and Playwright cannot be pointed at the live URL from here.
+  `app-production-656a.up.railway.app:443` and `pizza-house66.ai.studio:443`
+  both return `connect_rejected` from the egress proxy. Allowing those two
+  hosts in the environment's network settings would let `npm run smoke -- <url>`
+  and the full Playwright suite run against the deployment, and let the
+  ai.studio build be compared screen by screen.
 
 ---
 
