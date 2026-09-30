@@ -127,6 +127,34 @@ test.describe("customer ordering", () => {
     await expect(page).toHaveURL(/\/order\//, { timeout: 20_000 });
   });
 
+  test("the ASAP option tells the truth about when the food is ready", async ({ page }) => {
+    // "As soon as possible" used to promise a wait of roughly the preparation
+    // time whatever the clock said. While the restaurant is shut the real
+    // earliest pickup is whenever it next opens — hours away — so the card was
+    // making a promise the server would not keep.
+    //
+    // The assertion is tied to the header's own open/closed badge rather than
+    // to a fixed hour, so it holds whenever the suite happens to run.
+    await addPizzaToCart(page);
+    await page.getByRole("link", { name: /checkout|إتمام الطلب|متابعة/i }).first().click();
+
+    const header = (await page.locator("header").first().innerText()).trim();
+    const closed = /مغلق الآن|Closed now/.test(header);
+
+    const asapCard = page
+      .locator('input[name="pickup-mode"]')
+      .first()
+      .locator("xpath=ancestor::label[1]");
+    const asapText = (await asapCard.innerText()).replace(/\s+/g, " ");
+
+    if (closed) {
+      expect(asapText).toMatch(/مغلق الآن|Closed right now/);
+      expect(asapText).toMatch(/\d{1,2}:\d{2}/);
+    } else {
+      expect(asapText).toMatch(/~\s*\d+/);
+    }
+  });
+
   test("the tracking page is not indexable", async ({ page, request }) => {
     await addPizzaToCart(page);
     await page.getByRole("link", { name: /checkout|إتمام الطلب|متابعة/i }).first().click();

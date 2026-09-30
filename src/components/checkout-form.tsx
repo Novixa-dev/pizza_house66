@@ -54,6 +54,8 @@ export function CheckoutForm({
   paymentMethods,
   pickupDays,
   defaultPrepMinutes,
+  openNow,
+  earliestPickupLabel,
   bankDetails,
 }: {
   locale: Locale;
@@ -64,6 +66,9 @@ export function CheckoutForm({
   paymentMethods: PaymentOption[];
   pickupDays: PickupDay[];
   defaultPrepMinutes: number;
+  openNow: boolean;
+  /** Set only when the restaurant is shut and a later slot exists. */
+  earliestPickupLabel: string | null;
   bankDetails: { bankName: string | null; account: string | null; holder: string | null };
 }) {
   const t = getDictionary(locale);
@@ -339,7 +344,13 @@ export function CheckoutForm({
                 selected={pickupMode === "ASAP"}
                 onSelect={() => setPickupMode("ASAP")}
                 title={t.checkout.pickupAsap}
-                description={`${t.checkout.pickupAsapHint} · ~${defaultPrepMinutes} ${t.common.minutes}`}
+                description={
+                  // Closed: name the real time rather than promise a wait of
+                  // roughly the prep time, which would be hours out.
+                  !openNow && earliestPickupLabel
+                    ? `${t.checkout.pickupAsapClosedHint} · ${earliestPickupLabel}`
+                    : `${t.checkout.pickupAsapHint} · ~${defaultPrepMinutes} ${t.common.minutes}`
+                }
                 icon={<ClockIcon />}
                 name="pickup-mode"
               />

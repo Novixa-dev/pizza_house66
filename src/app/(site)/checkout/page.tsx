@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getLocale, pick } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionaries";
-import { enabledPaymentMethods, getRestaurant } from "@/server/restaurant";
+import { enabledPaymentMethods, getRestaurant, restaurantStatus } from "@/server/restaurant";
 import { getAvailablePickupSlots } from "@/server/orders";
 import { formatDate, formatTime, getZonedParts } from "@/lib/time";
 import { CheckoutForm, type PickupDay, type PaymentOption } from "@/components/checkout-form";
@@ -27,6 +27,18 @@ export default async function CheckoutPage() {
   const slots = restaurant.onlineOrderingPaused ? [] : await getAvailablePickupSlots();
   const days = groupSlotsByDay(slots, restaurant.timezone, locale, t.common.today, t.common.tomorrow);
 
+  // "As soon as possible" promises a wait of roughly the preparation time.
+  // That is true while the kitchen is open and a lie while it is shut — the
+  // real earliest pickup is whenever the restaurant next opens, which can be
+  // hours away. The card needs to say which of the two it is, so the first
+  // slot goes down with it (docs/PRD.md §12).
+  const status = restaurantStatus(restaurant);
+  const earliest = slots[0]?.at ?? null;
+  const earliestPickupLabel =
+    !status.open && earliest
+      ? `${formatDate(earliest, restaurant.timezone, locale)} · ${formatTime(earliest, restaurant.timezone, locale)}`
+      : null;
+
   const methods: PaymentOption[] = enabledPaymentMethods(restaurant).map((method) => ({
     type: method.type,
     label: t.paymentMethod[method.type],
@@ -43,6 +55,8 @@ export default async function CheckoutPage() {
       paymentMethods={methods}
       pickupDays={days}
       defaultPrepMinutes={restaurant.defaultPrepMinutes}
+      openNow={status.open}
+      earliestPickupLabel={earliestPickupLabel}
       bankDetails={{
         bankName: pick(locale, restaurant.bankNameAr, restaurant.bankNameEn),
         account: restaurant.bankAccount,
