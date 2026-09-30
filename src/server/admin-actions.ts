@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { DEFAULT_SESSIONS, SESSIONS_PER_DAY } from "@/lib/business-hours";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
 import { ForbiddenError } from "@/lib/permissions";
@@ -489,14 +490,6 @@ export async function deletePromotionAction(form: FormData): Promise<ActionState
 
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "time_format");
 
-/** How many services the hours form offers per day. */
-export const SESSIONS_PER_DAY = 2;
-
-/** What an unfilled service falls back to: the restaurant's real two shifts. */
-export const DEFAULT_SESSIONS = [
-  { opensAt: "08:00", closesAt: "12:00" },
-  { opensAt: "16:00", closesAt: "23:30" },
-] as const;
 
 export async function saveBusinessHoursAction(form: FormData): Promise<ActionState> {
   return run(async () => {

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLocale, pick } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionaries";
@@ -6,12 +7,14 @@ import { getOrderByTrackingToken } from "@/server/orders";
 import { getRestaurant } from "@/server/restaurant";
 import { formatMoney } from "@/lib/money";
 import { formatDateTime } from "@/lib/time";
-import { telLink, whatsappLink } from "@/lib/site";
+import { absoluteUrl, telLink, whatsappLink } from "@/lib/site";
 import { CUSTOMER_VISIBLE_LABELS, STATUS_TONE } from "@/lib/order-state";
 import { Badge, Card, DescriptionRow } from "@/components/ui";
 import { PhoneIcon, WhatsappIcon } from "@/components/ui/icons";
 import { OrderTimeline } from "@/components/order-timeline";
 import { OrderAutoRefresh } from "@/components/order-auto-refresh";
+import { RememberOrder } from "@/components/remember-order";
+import { ShareOrderLink } from "@/components/share-order-link";
 import { ReceiptUploader } from "@/components/receipt-uploader";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +66,14 @@ export default async function OrderTrackingPage({ params }: PageProps<"/order/[t
       {/* Only polls while the order is still moving; a completed order has
           nothing left to refresh for. */}
       {isLive ? <OrderAutoRefresh intervalMs={30_000} /> : null}
+
+      {/* The device keeps this order, so closing the tab is no longer how a
+          customer loses it. */}
+      <RememberOrder
+        token={token}
+        reference={order.reference}
+        placedAt={order.createdAt.toISOString()}
+      />
 
       <Card className="mb-6 p-6 text-center">
         <p className="text-sm text-ink-muted">{t.orderStatus.reference}</p>
@@ -215,8 +226,23 @@ export default async function OrderTrackingPage({ params }: PageProps<"/order/[t
             </a>
           ) : null}
         </div>
-        <p className="mt-4 text-xs text-ink-muted">
-          {t.orderStatus.saveLink}
+      </Card>
+
+      <Card className="mt-6 p-6">
+        <h2 className="font-bold text-ink">{t.orderStatus.saveLink}</h2>
+        <p className="mb-4 mt-1 text-sm text-ink-muted">{t.orderStatus.savedOnDevice}</p>
+        <ShareOrderLink
+          url={absoluteUrl(`/order/${token}`)}
+          reference={order.reference}
+          copyLabel={t.orderStatus.copyLink}
+          copiedLabel={t.orderStatus.linkCopied}
+          whatsappLabel={t.orderStatus.sendToWhatsapp}
+          whatsappMessage={pick(locale, "طلبي من بيتزا هاوس 66:", "My Pizza House 66 order:")}
+        />
+        <p className="mt-4 text-sm">
+          <Link href="/orders" className="font-semibold text-brand underline underline-offset-4">
+            {t.track.myOrders}
+          </Link>
         </p>
       </Card>
     </div>

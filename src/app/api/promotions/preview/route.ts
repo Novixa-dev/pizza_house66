@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { promoPreviewSchema } from "@/server/order-schema";
+import { normalizePhone, promoPreviewSchema } from "@/server/order-schema";
 import { previewPromotion } from "@/server/orders";
 import { checkRateLimit, clientKey } from "@/lib/rate-limit";
 
@@ -32,7 +32,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const preview = await previewPromotion(parsed.data.code, parsed.data.items);
+    const preview = await previewPromotion(
+      parsed.data.code,
+      parsed.data.items,
+      parsed.data.phone ? normalizePhone(parsed.data.phone) : null
+    );
     return NextResponse.json(preview);
   } catch (error) {
     console.error("[api/promotions/preview] failed", error);

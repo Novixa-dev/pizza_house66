@@ -242,6 +242,13 @@ export const LogoutIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const LockIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="4" y="10.5" width="16" height="10" rx="2" />
+    <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
+  </Icon>
+);
+
 export const ListIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />

@@ -30,15 +30,15 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   name         String
-  email        String   @unique
+  email        String    @unique
   passwordHash String
   role         Role
-  active       Boolean  @default(true)
+  active       Boolean   @default(true)
   lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   paymentReviews    PaymentStatusHistory[] @relation("ReviewedBy")
   orderStatusEvents OrderStatusHistory[]   @relation("ChangedBy")
@@ -57,14 +57,14 @@ model User {
 // ---------------------------------------------------------------------------
 
 model Restaurant {
-  id       String @id @default(cuid())
-  slug     String @unique
-  name     String
-  nameAr   String
+  id        String  @id @default(cuid())
+  slug      String  @unique
+  name      String
+  nameAr    String
   taglineAr String?
   taglineEn String?
-  aboutAr  String?
-  aboutEn  String?
+  aboutAr   String?
+  aboutEn   String?
 
   currency String @default("YER")
   // IANA timezone. All "HH:mm" business-hour strings and all pickup-slot
@@ -96,11 +96,11 @@ model Restaurant {
 
   // Bank-transfer payment instructions shown at checkout when that method is
   // enabled. Kept as data because account details change without a release.
-  bankNameAr    String?
-  bankNameEn    String?
-  bankAccount   String?
-  bankHolderAr  String?
-  bankHolderEn  String?
+  bankNameAr   String?
+  bankNameEn   String?
+  bankAccount  String?
+  bankHolderAr String?
+  bankHolderEn String?
 
   // SEO
   seoTitleAr       String?
@@ -211,9 +211,9 @@ model Product {
   featured       Boolean           @default(false)
   // Semantic label key ("bestseller" | "new" | "spicy" | "value"), localized
   // in the UI dictionary rather than stored as display text.
-  badge       String?
-  sortOrder   Int     @default(0)
-  prepMinutes Int? // overrides the restaurant default when set
+  badge          String?
+  sortOrder      Int               @default(0)
+  prepMinutes    Int? // overrides the restaurant default when set
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -271,29 +271,51 @@ enum DiscountType {
 }
 
 model Promotion {
-  id            String       @id @default(cuid())
-  code          String?      @unique // null = automatic offer, no code needed
-  nameAr        String
-  nameEn        String
-  descriptionAr String?
-  descriptionEn String?
-  discountType  DiscountType
-  discountValue Int // percent (1..100) or minor units, per discountType
-  minOrderMinor Int          @default(0)
+  id               String       @id @default(cuid())
+  code             String?      @unique // null = automatic offer, no code needed
+  nameAr           String
+  nameEn           String
+  descriptionAr    String?
+  descriptionEn    String?
+  discountType     DiscountType
+  discountValue    Int // percent (1..100) or minor units, per discountType
+  minOrderMinor    Int          @default(0)
   maxDiscountMinor Int?
-  startsAt      DateTime?
-  endsAt        DateTime?
-  active        Boolean      @default(true)
-  usageLimit    Int? // total redemptions allowed across all customers
-  usageCount    Int          @default(0)
+  startsAt         DateTime?
+  endsAt           DateTime?
+  active           Boolean      @default(true)
+  usageLimit       Int? // total redemptions allowed across all customers
+  usageCount       Int          @default(0)
+  /// How many times one phone number may use this code. Null = unlimited.
+  /// A public code without this is a code one person can spend all day on.
+  perCustomerLimit Int?
+
+  /// Whether the code is advertised, quietly honoured, or only ever reached
+  /// through a grant. An EARNED promotion has no usable shared code: it is a
+  /// template that CouponGrant issues from.
+  visibility PromotionVisibility @default(PUBLIC)
+
+  /// Ordering on the offers page. Lower first.
+  sortOrder Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   products PromotionProduct[]
   orders   Order[]
+  grants   CouponGrant[]
 
   @@index([active, startsAt, endsAt])
+  @@index([visibility, active, sortOrder])
+}
+
+enum PromotionVisibility {
+  /// Listed on the offers page for anyone to take.
+  PUBLIC
+  /// Works if you know it; never advertised. For printed flyers and partners.
+  PRIVATE
+  /// Issued per person as a CouponGrant. The promotion's own code is not usable.
+  EARNED
 }
 
 // When empty for a promotion, the promotion applies to the whole order.
@@ -317,7 +339,46 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders Order[]
+  // Running count of orders that actually reached the customer's hands.
+  // Denormalized because the loyalty rule reads it on every completion and
+  // the reward has to be decided in the same transaction that completes the
+  // order — counting rows there would race two tills marking up at once.
+  completedOrders Int @default(0)
+
+  orders  Order[]
+  coupons CouponGrant[]
+}
+
+/// A coupon issued to one person, with its own single-use code.
+///
+/// A Promotion is the offer — what comes off, and on what conditions. A grant
+/// is one person's claim on it. Keeping them apart is what lets the same
+/// "1,000 off your next order" reward be handed to a hundred regulars as a
+/// hundred codes that each work once, instead of one code that leaks to a
+/// WhatsApp group and costs the restaurant a hundred thousand rial.
+model CouponGrant {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  /// Why it was issued — "loyalty", "apology", "manual". Localized in the UI.
+  reason    String @default("loyalty")
+  /// Set when the reward is milestone-based, so the customer can be told what
+  /// they did to earn it rather than just finding a code.
+  milestone Int?
+
+  issuedAt  DateTime  @default(now())
+  expiresAt DateTime?
+
+  redeemedAt      DateTime?
+  redeemedOrderId String?   @unique
+  redeemedOrder   Order?    @relation(fields: [redeemedOrderId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, redeemedAt])
+  @@index([promotionId])
 }
 
 // ---------------------------------------------------------------------------
@@ -384,6 +445,9 @@ model Order {
   completedAt DateTime?
   cancelledAt DateTime?
 
+  /// The single-use coupon spent on this order, if one was.
+  couponGrant CouponGrant?
+
   items         OrderItem[]
   statusHistory OrderStatusHistory[]
   payment       Payment?
@@ -396,9 +460,9 @@ model Order {
 }
 
 model OrderItem {
-  id      String  @id @default(cuid())
-  orderId String
-  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   // Nullable so a product can be deleted without destroying order history;
   // the snapshot columns below keep the line readable regardless.
   productId String?
@@ -418,15 +482,15 @@ model OrderItem {
 }
 
 model OrderItemOption {
-  id            String              @id @default(cuid())
-  orderItemId   String
-  orderItem     OrderItem           @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  optionValueId String?
-  optionValue   ProductOptionValue? @relation(fields: [optionValueId], references: [id], onDelete: SetNull)
-  groupNameAr   String
-  groupNameEn   String
-  nameAr        String // snapshot
-  nameEn        String
+  id              String              @id @default(cuid())
+  orderItemId     String
+  orderItem       OrderItem           @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  optionValueId   String?
+  optionValue     ProductOptionValue? @relation(fields: [optionValueId], references: [id], onDelete: SetNull)
+  groupNameAr     String
+  groupNameEn     String
+  nameAr          String // snapshot
+  nameEn          String
   priceDeltaMinor Int
 
   @@index([orderItemId])
@@ -552,14 +616,14 @@ model Notification {
 // ---------------------------------------------------------------------------
 
 model AnalyticsEvent {
-  id        String   @id @default(cuid())
-  name      String
-  sessionId String?
-  orderId   String?
-  productId String?
+  id         String   @id @default(cuid())
+  name       String
+  sessionId  String?
+  orderId    String?
+  productId  String?
   valueMinor Int?
-  metadata  Json?
-  createdAt DateTime @default(now())
+  metadata   Json?
+  createdAt  DateTime @default(now())
 
   @@index([name, createdAt])
   @@index([createdAt])

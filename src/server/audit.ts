@@ -34,6 +34,7 @@ export type AuditAction =
   | "promotion.create"
   | "promotion.update"
   | "promotion.delete"
+  | "coupon.granted"
   | "hours.update"
   | "hours.override.create"
   | "hours.override.delete"

@@ -5,7 +5,7 @@ import { getDictionary } from "@/lib/i18n/dictionaries";
 import { pick } from "@/lib/i18n/pick";
 import { telLink, whatsappLink } from "@/lib/site";
 import type { RestaurantWithConfig } from "@/server/restaurant";
-import { InstagramIcon, PhoneIcon, PinIcon, WhatsappIcon } from "./ui/icons";
+import { InstagramIcon, LockIcon, PhoneIcon, PinIcon, WhatsappIcon } from "./ui/icons";
 import { formatOpeningHours } from "@/lib/hours-display";
 
 export function SiteFooter({
@@ -46,21 +46,23 @@ export function SiteFooter({
               Arabic because [dir="rtl"] sets line-height 1.75 — accessible in
               one language and not the other, which is not accessible. */}
           <ul className="space-y-2 text-sm">
-            <li>
-              <Link href="/menu" className="inline-flex min-h-6 items-center text-ink-soft hover:text-brand">
-                {t.common.viewMenu}
-              </Link>
-            </li>
-            <li>
-              <Link href="/#offers" className="inline-flex min-h-6 items-center text-ink-soft hover:text-brand">
-                {t.common.offers}
-              </Link>
-            </li>
-            <li>
-              <Link href="/#faq" className="inline-flex min-h-6 items-center text-ink-soft hover:text-brand">
-                {t.home.faqTitle}
-              </Link>
-            </li>
+            {[
+              { href: "/menu", label: t.common.viewMenu },
+              { href: "/offers", label: t.common.offers },
+              { href: "/orders", label: t.common.myOrders },
+              { href: "/about", label: t.common.about },
+              { href: "/contact", label: t.common.contact },
+              { href: "/faq", label: t.home.faqTitle },
+            ].map((link) => (
+              <li key={link.href}>
+                <Link
+                  href={link.href}
+                  className="inline-flex min-h-6 items-center text-ink-soft hover:text-brand"
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
           </ul>
         </nav>
 
@@ -137,6 +139,27 @@ export function SiteFooter({
           <p>
             © <span className="numeric">{new Date().getFullYear()}</span> {name}
           </p>
+          {/* The staff entrance sits here rather than in the main navigation:
+              it is the one link a customer never needs and staff use daily,
+              and every restaurant's team learns to look at the bottom of the
+              page for it. Not hidden — hidden would mean a bookmark is the
+              only way in, and a new hire has no bookmark. */}
+          <nav aria-label={t.pages.staffSignIn} className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <Link href="/terms" className="inline-flex min-h-6 items-center hover:text-brand">
+              {t.pages.termsTitle}
+            </Link>
+            <Link href="/privacy" className="inline-flex min-h-6 items-center hover:text-brand">
+              {t.pages.privacyTitle}
+            </Link>
+            <Link
+              href="/admin"
+              className="inline-flex min-h-6 items-center gap-1.5 font-semibold hover:text-brand"
+            >
+              <LockIcon />
+              {t.pages.staffSignIn}
+            </Link>
+          </nav>
+
           <p>
             {t.common.poweredBy}{" "}
             <span className="font-semibold text-ink-soft">Novixa Restaurant</span>

@@ -54,7 +54,14 @@ export type PromotionRejectionCode =
   | "EXPIRED"
   | "USAGE_EXHAUSTED"
   | "BELOW_MINIMUM"
-  | "NO_ELIGIBLE_ITEMS";
+  | "NO_ELIGIBLE_ITEMS"
+  // The four below are about *who* is using the code rather than what is in
+  // the basket, so they are decided before the basket is priced at all
+  // (src/server/orders.ts, resolvePromoCode).
+  | "NEEDS_PHONE"
+  | "NOT_YOURS"
+  | "ALREADY_USED"
+  | "CUSTOMER_LIMIT";
 
 export interface PromotionEvaluation {
   applicable: boolean;

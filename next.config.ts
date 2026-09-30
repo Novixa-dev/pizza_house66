@@ -15,6 +15,16 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
   },
 
+  async redirects() {
+    return [
+      // The previous version of this site tracked orders at /track, and that
+      // URL is on receipts and in people's history. It costs nothing to keep
+      // working, and a dead link is how a customer decides the order is lost.
+      { source: "/track", destination: "/orders", permanent: true },
+      { source: "/my-orders", destination: "/orders", permanent: true },
+    ];
+  },
+
   // Security headers that do not depend on per-request state live here; the
   // CSP nonce and the rest are set in src/proxy.ts, which runs per request.
   async headers() {

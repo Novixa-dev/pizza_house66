@@ -71,6 +71,10 @@ export const uploadReceiptSchema = z.object({
 export const promoPreviewSchema = z.object({
   code: z.string().trim().min(2).max(40),
   items: z.array(cartItemSchema).min(1).max(50),
+  // Optional because the customer may type the code before their number.
+  // A single-use coupon cannot be checked without it, and the preview says
+  // so rather than promising a discount checkout would then withdraw.
+  phone: phoneSchema.optional(),
 });
 
 /** Strips formatting so the same human phone number always maps to one customer row. */

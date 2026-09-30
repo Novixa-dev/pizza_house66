@@ -7,6 +7,7 @@ import type { OrderStatus, Role } from "@prisma/client";
 import { recordAudit } from "./audit";
 import { notifyOrderStatus } from "./notifications";
 import { track } from "./analytics";
+import { recordCompletionAndReward } from "./coupons";
 
 // Every staff-initiated change to an order or a payment funnels through this
 // module. It is the single place that:
@@ -71,7 +72,7 @@ export async function transitionOrder(
   const field = TIMESTAMP_FIELD[toStatus];
   const now = new Date();
 
-  await prisma.$transaction(async (tx) => {
+  const reward = await prisma.$transaction(async (tx) => {
     // Conditioning the update on the status we validated against turns a
     // concurrent double-click by two staff members into one winner and one
     // clear error, instead of two history rows for the same move
@@ -91,6 +92,13 @@ export async function transitionOrder(
         reason,
       },
     });
+
+    // Handing the food over is the moment the order counts, so it is also the
+    // moment the loyalty counter moves and a reward can fall due. Inside the
+    // transaction on purpose: the counter and the order that advanced it have
+    // to agree, or a rolled-back completion leaves someone a step closer to a
+    // coupon for an order they never collected.
+    return toStatus === "COMPLETED" ? recordCompletionAndReward(tx, orderId, now) : null;
   });
 
   await recordAudit({
@@ -105,6 +113,19 @@ export async function transitionOrder(
   const analyticsEvent = ANALYTICS_FOR_STATUS[toStatus];
   if (analyticsEvent) {
     await track({ name: analyticsEvent, orderId, valueMinor: order.totalMinor });
+  }
+
+  // Logged rather than notified: there is no messaging channel wired up yet,
+  // and the coupon is already waiting on the customer's orders page. The
+  // audit line is what lets the owner see rewards going out.
+  if (reward) {
+    await recordAudit({
+      actor,
+      action: "coupon.granted",
+      entity: "Order",
+      entityId: orderId,
+      metadata: { code: reward.code, milestone: reward.milestone },
+    });
   }
 }
 

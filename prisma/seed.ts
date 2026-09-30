@@ -17,6 +17,7 @@
  * (docs/PRD.md §39 "no default production credentials").
  */
 
+import { LOYALTY_PROMOTION_CODE } from "../src/lib/loyalty";
 import { PrismaClient, type AvailabilityState, type PrismaPromise } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
@@ -611,50 +612,127 @@ async function seedCatalog() {
 }
 
 async function seedPromotions() {
-  const pizzaProducts = await prisma.product.findMany({
-    where: { category: { slug: "pizza" } },
-    select: { id: true },
-  });
-
-  const familyDeal = await prisma.promotion.upsert({
-    where: { code: "FAMILY10" },
-    create: {
+  // Three public offers and one reward template. The public ones exist to be
+  // *advertised* — they are the reason the offers page has anything on it —
+  // and each answers a different question the owner has about their trade:
+  //
+  //   WELCOME    turns a first visit into a first order. Capped at one per
+  //              phone number, because its whole value is the first time.
+  //   FAMILY10   raises the average basket. It pays nothing below 5,000 and
+  //              is capped at 1,500, so the discount can never outrun the
+  //              extra the customer had to spend to earn it.
+  //   MORNING    fills the 08:00-12:00 service, which is the quiet one. A
+  //              fixed 300 off pastries costs little and moves demand out of
+  //              the evening rush the kitchen is already struggling with.
+  //
+  // The fourth is never advertised and its code never works: LOYALTY-REWARD
+  // is the template each earned coupon is issued from (src/lib/loyalty.ts).
+  const offers = [
+    {
+      code: "WELCOME",
+      nameAr: "ترحيب بأول طلب",
+      nameEn: "Welcome — your first order",
+      descriptionAr: "خصم ١٠٪ على أول طلب لك من بيتزا هاوس 66، حتى ١٬٠٠٠ ريال.",
+      descriptionEn: "10% off your first order with Pizza House 66, up to 1,000 YER.",
+      discountType: "PERCENTAGE" as const,
+      discountValue: 10,
+      minOrderMinor: 2000,
+      maxDiscountMinor: 1000,
+      perCustomerLimit: 1,
+      visibility: "PUBLIC" as const,
+      sortOrder: 0,
+    },
+    {
       code: "FAMILY10",
       nameAr: "خصم العائلة ١٠٪",
       nameEn: "Family deal — 10% off",
-      descriptionAr: "خصم ١٠٪ على الطلبات التي تتجاوز ٥٬٠٠٠ ريال.",
-      descriptionEn: "10% off orders over 5,000 YER.",
-      discountType: "PERCENTAGE",
+      descriptionAr: "خصم ١٠٪ على الطلبات التي تتجاوز ٥٬٠٠٠ ريال، حتى ١٬٥٠٠ ريال.",
+      descriptionEn: "10% off orders over 5,000 YER, up to 1,500 YER.",
+      discountType: "PERCENTAGE" as const,
       discountValue: 10,
       minOrderMinor: 5000,
       maxDiscountMinor: 1500,
-      active: true,
+      perCustomerLimit: null,
+      visibility: "PUBLIC" as const,
+      sortOrder: 1,
     },
-    update: {},
-  });
-
-  const pizzaTuesday = await prisma.promotion.upsert({
-    where: { code: "PIZZA500" },
-    create: {
-      code: "PIZZA500",
-      nameAr: "وفّر ٥٠٠ على البيتزا",
-      nameEn: "500 off any pizza",
-      descriptionAr: "خصم ٥٠٠ ريال على أي بيتزا عند الطلب المسبق.",
-      descriptionEn: "500 YER off any pizza when you order ahead.",
-      discountType: "FIXED",
-      discountValue: 500,
-      minOrderMinor: 2000,
-      active: true,
+    {
+      code: "MORNING",
+      nameAr: "فطور بيتزا هاوس",
+      nameEn: "Pizza House breakfast",
+      descriptionAr: "خصم ٣٠٠ ريال على الفطائر والمعجنات في الفترة الصباحية.",
+      descriptionEn: "300 YER off pastries during the morning service.",
+      discountType: "FIXED" as const,
+      discountValue: 300,
+      minOrderMinor: 1500,
+      maxDiscountMinor: null,
+      perCustomerLimit: null,
+      visibility: "PUBLIC" as const,
+      sortOrder: 2,
     },
-    update: {},
-  });
+    {
+      code: LOYALTY_PROMOTION_CODE,
+      nameAr: "مكافأة الوفاء",
+      nameEn: "Loyalty reward",
+      descriptionAr: "خصم ١٬٠٠٠ ريال، هديّة لك بعد كل خمسة طلبات مكتملة.",
+      descriptionEn: "1,000 YER off, yours after every five completed orders.",
+      discountType: "FIXED" as const,
+      discountValue: 1000,
+      minOrderMinor: 2500,
+      maxDiscountMinor: null,
+      perCustomerLimit: null,
+      visibility: "EARNED" as const,
+      sortOrder: 9,
+    },
+  ];
 
+  const created: Record<string, string> = {};
+  for (const offer of offers) {
+    const row = await prisma.promotion.upsert({
+      where: { code: offer.code },
+      create: { ...offer, active: true },
+      // The wording, the amounts and the visibility are refreshed; the usage
+      // counter is the restaurant's own trading record and is never reset.
+      update: {
+        nameAr: offer.nameAr,
+        nameEn: offer.nameEn,
+        descriptionAr: offer.descriptionAr,
+        descriptionEn: offer.descriptionEn,
+        discountType: offer.discountType,
+        discountValue: offer.discountValue,
+        minOrderMinor: offer.minOrderMinor,
+        maxDiscountMinor: offer.maxDiscountMinor,
+        perCustomerLimit: offer.perCustomerLimit,
+        visibility: offer.visibility,
+        sortOrder: offer.sortOrder,
+      },
+    });
+    created[offer.code] = row.id;
+  }
+
+  // The morning offer only applies to what the morning service actually
+  // bakes, so it is scoped to those products rather than the whole basket.
+  const pastries = await prisma.product.findMany({
+    where: { category: { slug: { in: ["pastries", "sides"] } }, availability: { not: "HIDDEN" } },
+    select: { id: true },
+  });
   await prisma.promotionProduct.createMany({
-    data: pizzaProducts.map((product) => ({ promotionId: pizzaTuesday.id, productId: product.id })),
+    data: pastries.map((product) => ({
+      promotionId: created.MORNING!,
+      productId: product.id,
+    })),
     skipDuplicates: true,
   });
 
-  return { familyDeal, pizzaTuesday };
+  // An offer the seed no longer lists is switched off rather than deleted:
+  // orders point at the promotion they were discounted by, and deleting one
+  // would rewrite what a customer was actually charged.
+  await prisma.promotion.updateMany({
+    where: { code: { notIn: offers.map((offer) => offer.code) }, active: true },
+    data: { active: false },
+  });
+
+  return created;
 }
 
 async function seedStaff() {

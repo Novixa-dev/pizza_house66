@@ -19,6 +19,7 @@ import {
   evaluatePromotion,
   lineUnitPrice,
   type PricedLine,
+  type PromotionRejectionCode,
   type PromotionRule,
 } from "@/lib/pricing";
 import { RELEASED_SLOT_STATUSES } from "@/lib/order-state";
@@ -83,6 +84,13 @@ export class BelowMinimumOrderError extends Error {
     super("Order total is below the restaurant minimum");
     this.name = "BelowMinimumOrderError";
     this.minimumMinor = minimumMinor;
+  }
+}
+
+export class CouponAlreadyUsedError extends Error {
+  constructor() {
+    super("That coupon has already been used.");
+    this.name = "CouponAlreadyUsedError";
   }
 }
 
@@ -201,15 +209,11 @@ async function priceBasket(
   return { lines, maxPrepMinutes };
 }
 
-async function loadPromotion(
-  code: string,
-  tx: Prisma.TransactionClient = prisma
-): Promise<PromotionRule | null> {
-  const promotion = await tx.promotion.findUnique({
-    where: { code: code.toUpperCase() },
-    include: { products: { select: { productId: true } } },
-  });
-  if (!promotion) return null;
+type PromotionRow = Prisma.PromotionGetPayload<{
+  include: { products: { select: { productId: true } } };
+}>;
+
+function toRule(promotion: PromotionRow): PromotionRule {
   return {
     id: promotion.id,
     code: promotion.code,
@@ -223,6 +227,98 @@ async function loadPromotion(
     usageLimit: promotion.usageLimit,
     usageCount: promotion.usageCount,
     productIds: promotion.products.map((p) => p.productId),
+  };
+}
+
+export interface ResolvedPromoCode {
+  rule: PromotionRule;
+  nameAr: string;
+  nameEn: string;
+  /** Set when the code was a single-use coupon issued to this customer. */
+  grantId?: string;
+}
+
+/**
+ * Turns a typed code into the rule that prices it.
+ *
+ * Two kinds of code arrive at the same box. A **promotion code** is shared —
+ * printed on a flyer, listed on the offers page — and its limits are about
+ * everyone: a total cap, and how often one phone number may use it. A **grant
+ * code** belongs to one person, works once, and carries its own expiry.
+ *
+ * They are resolved in that order of specificity, grants first, because a
+ * grant code is random and cannot collide with a chosen one.
+ *
+ * `phone` is what makes the per-customer rules enforceable. Without it — at
+ * preview time, before the customer has typed their number — a grant cannot
+ * be checked at all, so it is refused rather than optimistically allowed: a
+ * preview that promises a discount checkout then withdraws is worse than one
+ * that asks for the phone number first.
+ */
+export async function resolvePromoCode(
+  code: string,
+  phone: string | null,
+  tx: Prisma.TransactionClient = prisma,
+  now = new Date()
+): Promise<{ resolved: ResolvedPromoCode | null; reasonCode?: PromotionRejectionCode }> {
+  const normalized = code.trim().toUpperCase();
+  if (!normalized) return { resolved: null, reasonCode: "NOT_FOUND" };
+
+  const grant = await tx.couponGrant.findUnique({
+    where: { code: normalized },
+    include: {
+      customer: { select: { phone: true } },
+      promotion: { include: { products: { select: { productId: true } } } },
+    },
+  });
+
+  if (grant) {
+    if (!phone) return { resolved: null, reasonCode: "NEEDS_PHONE" };
+    if (grant.customer.phone !== phone) return { resolved: null, reasonCode: "NOT_YOURS" };
+    if (grant.redeemedAt) return { resolved: null, reasonCode: "ALREADY_USED" };
+    if (grant.expiresAt && grant.expiresAt < now) {
+      return { resolved: null, reasonCode: "EXPIRED" };
+    }
+    return {
+      resolved: {
+        // A grant is its own usage limit: one code, one use, already checked
+        // above. The promotion's shared counters would refuse every grant
+        // after the offer's overall cap, which is not what a cap on a public
+        // code is for.
+        rule: { ...toRule(grant.promotion), usageLimit: null, usageCount: 0, active: true },
+        nameAr: grant.promotion.nameAr,
+        nameEn: grant.promotion.nameEn,
+        grantId: grant.id,
+      },
+    };
+  }
+
+  const promotion = await tx.promotion.findUnique({
+    where: { code: normalized },
+    include: { products: { select: { productId: true } } },
+  });
+  if (!promotion) return { resolved: null, reasonCode: "NOT_FOUND" };
+
+  // An EARNED promotion is a template that grants are issued from. Its own
+  // code must never work, or the reward is a public discount.
+  if (promotion.visibility === "EARNED") return { resolved: null, reasonCode: "NOT_FOUND" };
+
+  if (promotion.perCustomerLimit !== null) {
+    if (!phone) return { resolved: null, reasonCode: "NEEDS_PHONE" };
+    const used = await tx.order.count({
+      where: {
+        guestPhone: phone,
+        promotionId: promotion.id,
+        status: { notIn: ["CANCELLED", "REJECTED"] },
+      },
+    });
+    if (used >= promotion.perCustomerLimit) {
+      return { resolved: null, reasonCode: "CUSTOMER_LIMIT" };
+    }
+  }
+
+  return {
+    resolved: { rule: toRule(promotion), nameAr: promotion.nameAr, nameEn: promotion.nameEn },
   };
 }
 
@@ -252,21 +348,23 @@ export interface PromoPreview {
 export async function previewPromotion(
   code: string,
   items: CreateOrderInput["items"],
+  phone: string | null = null,
   now = new Date()
 ): Promise<PromoPreview> {
   const restaurant = await getRestaurant();
   const { lines } = await priceBasket(items, restaurant.defaultPrepMinutes);
-  const rule = await loadPromotion(code);
-  if (!rule) return { valid: false, discountMinor: 0, reasonCode: "NOT_FOUND" };
+  const { resolved, reasonCode } = await resolvePromoCode(code, phone, prisma, now);
+  if (!resolved) {
+    return { valid: false, discountMinor: 0, reasonCode: reasonCode ?? "NOT_FOUND" };
+  }
 
-  const promotion = await prisma.promotion.findUnique({ where: { id: rule.id } });
-  const evaluation = evaluatePromotion(rule, lines, now);
+  const evaluation = evaluatePromotion(resolved.rule, lines, now);
   return {
     valid: evaluation.applicable,
     discountMinor: evaluation.discountMinor,
     reasonCode: evaluation.reasonCode,
-    nameAr: promotion?.nameAr,
-    nameEn: promotion?.nameEn,
+    nameAr: resolved.nameAr,
+    nameEn: resolved.nameEn,
   };
 }
 
@@ -332,15 +430,21 @@ export async function createOrder(input: CreateOrderInput): Promise<CreatedOrder
 
   const { lines, maxPrepMinutes } = await priceBasket(input.items, restaurant.defaultPrepMinutes);
 
+  const phone = normalizePhone(input.customer.phone);
+
   let discountMinor = 0;
   let promotionId: string | null = null;
+  let grantId: string | null = null;
   if (input.promoCode) {
-    const rule = await loadPromotion(input.promoCode);
-    if (rule) {
-      const evaluation = evaluatePromotion(rule, lines, now);
+    // The phone goes in so a single-use coupon can be matched to its owner
+    // and a per-customer cap can be counted.
+    const { resolved } = await resolvePromoCode(input.promoCode, phone, prisma, now);
+    if (resolved) {
+      const evaluation = evaluatePromotion(resolved.rule, lines, now);
       if (evaluation.applicable) {
         discountMinor = evaluation.discountMinor;
-        promotionId = rule.id;
+        promotionId = resolved.rule.id;
+        grantId = resolved.grantId ?? null;
       }
     }
     // An invalid code doesn't fail the order — the customer just doesn't get
@@ -367,8 +471,6 @@ export async function createOrder(input: CreateOrderInput): Promise<CreatedOrder
           originalName: sanitizeFilename(input.payment.receipt.originalName),
         }
       : null;
-
-  const phone = normalizePhone(input.customer.phone);
 
   const order = await prisma.$transaction(async (tx) => {
     await assertSlotHasCapacity(tx, slotStartAt, restaurant, config);
@@ -460,6 +562,18 @@ export async function createOrder(input: CreateOrderInput): Promise<CreatedOrder
         where: { id: promotionId },
         data: { usageCount: { increment: 1 } },
       });
+    }
+
+    if (grantId) {
+      // Conditioned on the coupon still being unredeemed, so two orders
+      // submitted at the same moment with the same coupon cannot both spend
+      // it. The loser's update matches nothing and the order is rejected
+      // rather than quietly discounted twice.
+      const claimed = await tx.couponGrant.updateMany({
+        where: { id: grantId, redeemedAt: null },
+        data: { redeemedAt: now, redeemedOrderId: created.id },
+      });
+      if (claimed.count === 0) throw new CouponAlreadyUsedError();
     }
 
     return created;

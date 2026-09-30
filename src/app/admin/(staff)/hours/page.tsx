@@ -7,10 +7,9 @@ import { formatDate } from "@/lib/time";
 import {
   addScheduleOverrideAction,
   deleteScheduleOverrideAction,
-  DEFAULT_SESSIONS,
-  SESSIONS_PER_DAY,
   saveBusinessHoursAction,
 } from "@/server/admin-actions";
+import { DEFAULT_SESSIONS, SESSIONS_PER_DAY } from "@/lib/business-hours";
 import { Alert, Card, Checkbox, Field, Input, SectionHeading } from "@/components/ui";
 import { InfoIcon, TrashIcon } from "@/components/ui/icons";
 import { SubmitButton } from "@/components/admin/submit-button";

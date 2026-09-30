@@ -39,8 +39,12 @@ export async function SiteHeader({
 
   const navLinks = [
     { href: "/menu", label: t.common.menu },
-    { href: "/#offers", label: t.common.offers },
-    { href: "/#visit", label: t.common.contact },
+    { href: "/offers", label: t.common.offers },
+    // A guest order lives behind a link and nothing else, so the way back to
+    // it has to be somewhere permanent. The header is the only place a
+    // customer looks after closing the tab.
+    { href: "/orders", label: t.common.myOrders },
+    { href: "/contact", label: t.common.contact },
   ];
 
   return (

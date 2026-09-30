@@ -20,6 +20,11 @@ export default async function NotFound() {
         <Link href="/menu" className={buttonClass("secondary")}>
           {t.common.viewMenu}
         </Link>
+        {/* The commonest way to land here is an order link that was mistyped
+            or half-copied, so the page that recovers an order belongs on it. */}
+        <Link href="/orders" className={buttonClass("ghost")}>
+          {t.common.myOrders}
+        </Link>
       </div>
     </div>
   );
