@@ -1,69 +1,94 @@
 # Roadmap
 
-Status of `docs/PRD.md` §82's phases as of this build.
+Status against the phases in `docs/PRD.md` §82. `docs/PROJECT-STATUS.md` has
+the feature-by-feature table; this is the shape of the journey.
 
-## Phase 0 — Discovery: partial
+## Phase 0 — Discovery: partial, and blocked externally
 
-Done: architecture, data model, roles, PRD/vision captured
-(docs/PROJECT_ORIGIN.md, docs/PRD.md). Partial: restaurant discovery
-(docs/RESTAURANT_DISCOVERY.md) — Instagram/web access was blocked in this
-environment, so menu/prices/hours/contact info are unverified assumptions
-(docs/ASSUMPTIONS.md), not confirmed facts.
+Done: architecture, data model, roles, the full PRD and vision document
+(`docs/PROJECT_ORIGIN.md`, `docs/PRD.md`).
 
-## Phase 1/2 — Sales demo → MVP: this build
+Not done: **restaurant discovery**. Instagram and web access were blocked in
+the environment this was built in, so the real menu, prices, hours and
+contact details were never verifiable (`docs/RESTAURANT_DISCOVERY.md`).
+Everything in the seed is a placeholder, catalogued in
+`docs/ASSUMPTIONS.md`. This is the one phase that cannot be completed by a
+developer.
 
-Shipped in this pass:
+## Phase 1–2 — Sales demo → MVP: **complete**
 
-- Bilingual (Arabic RTL default / English LTR) public site: home, database-
-  driven menu, product customization (sizes + add-ons via a generic option
-  system), cart (persisted client-side), checkout with guest information.
+The full product, not a demo of one:
+
+- Bilingual (Arabic RTL default / English LTR) public site: home, menu,
+  product pages with a generic option system, cart, checkout, order tracking
 - **Scheduled pickup with real kitchen-release calculation** — the core
-  feature from `docs/PROJECT_ORIGIN.md` §4 — plus ASAP pickup, business-hours
-  validation, and slot-capacity limiting.
-- Server-authoritative order creation: price recalculation, availability
-  checks, idempotent duplicate handling.
-- Configurable payment methods (pay-at-pickup live; bank transfer with a
-  manual verification queue; electronic payment modeled but disabled).
-- Order status state machine with role-gated transitions and full history.
-- Guest order tracking by capability token.
-- Staff admin (orders list, payment verification, pause/resume online
-  ordering) and a kitchen display (queued/preparing/ready board), both
-  behind real authentication and RBAC.
-- Unit tests for the scheduling and state-machine logic; lint/typecheck/
-  build all green.
+  feature from `PROJECT_ORIGIN.md` §4 — with business-hours validation, slot
+  capacity, and a timezone layer that evaluates the restaurant's hours in the
+  restaurant's zone regardless of where the server runs
+- Server-authoritative pricing, promotions, idempotent order creation
+- Payment methods with a bank-transfer verification queue and receipt upload
+- Order state machine with per-transition permissions and full history
+- **The complete staff admin**: dashboard, orders, payments, products,
+  categories, options, promotions, customers, hours, settings, staff,
+  reports, audit
+- Kitchen display with one-tap transitions
+- Permission matrix (26 permissions, 4 roles) enforced server-side
+- Nonce-based CSP and the hardening header set
+- First-party analytics and the conversion funnel
+- SEO: structured data, sitemap, robots, Open Graph, PWA manifest
+- 84 unit / 24 integration / 48 E2E tests, and a CI pipeline
 
-Not yet built (explicitly deferred, not silently dropped):
+## Phase 3 — Production hardening: partially done
 
-- Product/category/business-hours management UI — data is seeded directly;
-  an admin CRUD UI for these is the natural next slice.
-- Receipt image upload for bank transfers (currently text reference number
-  only) — see docs/SECURITY.md for what secure upload handling requires.
-- Customer-facing notifications beyond the tracking page (WhatsApp
-  click-to-chat link exists in the footer/tracking page; no automated
-  status messages yet).
-- A real scheduled job for kitchen release (currently lazy-on-page-load —
-  see docs/DECISIONS.md).
-- Playwright E2E suite, integration tests, accessibility/security test
-  passes (docs/TESTING.md).
-- SEO essentials beyond basic `<title>`/description metadata: sitemap,
-  robots.txt, Restaurant/LocalBusiness structured data, Open Graph images.
+**Done in this build:** PostgreSQL with versioned migrations; real
+authentication and RBAC; rate limiting; audit logging; error boundaries that
+never leak internals; scheduled kitchen release with a fail-closed cron
+endpoint; the security controls in `docs/SECURITY.md`; a deployment guide.
 
-## Phase 3 — Production hardening: not started
+**Remaining, and it is owner work rather than development:** a production
+database, a domain, TLS (which the host provides), backups with a *tested*
+restore, error tracking, and replacing every entry in `docs/ASSUMPTIONS.md`
+with confirmed data. `docs/HANDOVER.md` is the checklist.
 
-Domain, SSL, real Postgres, backups, monitoring, error tracking, the
-security/testing gaps above, and replacing every entry in
-docs/ASSUMPTIONS.md with confirmed owner-provided data.
+**Remaining development, small:** dependency scanning in CI, and
+shared-store rate limiting before the deployment ever runs more than one
+instance.
 
 ## Phase 4 — Growth: not started
 
-Delivery, promotions, reviews, loyalty, automated WhatsApp, richer
-analytics, reorder.
+Delivery, loyalty, reviews, reorder-from-history, richer promotions, customer
+accounts. All deliberately deferred — `PRD.md` §5.2 is explicit that the MVP
+is pickup-only and guest-only.
 
-## Phase 5 — Productization (Novixa Restaurant): partially enabled by design
+The two worth doing first, and why:
 
-The schema and business logic already avoid hardcoding Pizza House
-specifics where the PRD calls for it (generic product-option system,
-single centralized `Restaurant` config row, currency/branding read from
-data not code — see docs/DECISIONS.md "Single restaurant row"). Actual
-multi-tenancy (per-tenant data isolation, onboarding, billing) is
-intentionally not built, per `docs/PRD.md` §5.2/§89.
+1. **Per-language URLs** (`app/[lang]/…`). Not a growth feature as such, but
+   the single highest-value remaining change: it is what makes both languages
+   separately indexable, and it is additive — the dictionaries and `pick()`
+   carry over untouched (`docs/SEO.md`).
+2. **WhatsApp order notifications.** The notification records already exist
+   and already drive the tracking page; only delivery is missing. In Yemen,
+   WhatsApp is the channel customers actually read, and "your order is ready"
+   arriving there is worth more than any other feature on this list.
+
+## Phase 5 — Productization (Novixa Restaurant): enabled by design, not built
+
+Actual multi-tenancy — per-tenant isolation, onboarding, billing — is
+deliberately not built (`PRD.md` §5.2, §89).
+
+What *was* done, so that it stays a change rather than a rewrite:
+
+- Every restaurant-specific value lives in one `Restaurant` row and is
+  editable from the admin panel. **No business logic hardcodes a Pizza House
+  value.**
+- The option system is generic — it expresses a pizza size, a burger size, a
+  drink size or a crust type with no schema change, exactly as
+  `PROJECT_ORIGIN.md` §16 asks.
+- The timezone is data, so a restaurant in another zone is a row, not a
+  release.
+- Currency is data.
+- The design system is token-driven; retheming is one CSS block.
+- The permission matrix is a table, so a new role is one entry.
+
+Adding `restaurantId` later is a schema change and a query filter. It is not
+a redesign, and that was the point of every decision above.

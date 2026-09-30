@@ -3,8 +3,11 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "./cart-context";
-import { formatMoney } from "@/lib/money";
+import { trackClient } from "./analytics-tracker";
+import { formatMoney, formatMoneyDelta } from "@/lib/money";
 import { getDictionary, type Locale } from "@/lib/i18n/dictionaries";
+import { Button, Field, Textarea } from "./ui";
+import { CheckIcon, MinusIcon, PlusIcon } from "./ui/icons";
 
 interface OptionValue {
   id: string;
@@ -13,23 +16,36 @@ interface OptionValue {
   priceDeltaMinor: number;
   available: boolean;
 }
+
 interface OptionGroup {
   id: string;
   nameAr: string;
   nameEn: string;
   required: boolean;
   multiSelect: boolean;
+  maxSelect: number | null;
   values: OptionValue[];
 }
+
 interface ProductForCustomizer {
   id: string;
   slug: string;
   nameAr: string;
   nameEn: string;
+  imageUrl: string | null;
   basePriceMinor: number;
   optionGroups: OptionGroup[];
 }
 
+const MAX_QUANTITY = 20;
+
+/**
+ * Product customization.
+ *
+ * The running total shown here is a preview only — `createOrder` recomputes
+ * every figure from the database before an order exists, so a tampered price
+ * in this component buys nothing (docs/PRD.md §43).
+ */
 export function ProductCustomizer({
   product,
   locale,
@@ -43,150 +59,217 @@ export function ProductCustomizer({
   const router = useRouter();
   const { addItem } = useCart();
 
+  // Required single-select groups start on their first available value so the
+  // page opens in a valid, orderable state rather than with a disabled button.
   const [selected, setSelected] = useState<Record<string, string[]>>(() => {
     const initial: Record<string, string[]> = {};
     for (const group of product.optionGroups) {
-      if (group.required && !group.multiSelect && group.values[0]) {
-        initial[group.id] = [group.values[0].id];
-      } else {
-        initial[group.id] = [];
-      }
+      const firstAvailable = group.values.find((value) => value.available);
+      initial[group.id] =
+        group.required && !group.multiSelect && firstAvailable ? [firstAvailable.id] : [];
     }
     return initial;
   });
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
-  const [added, setAdded] = useState(false);
+  const [justAdded, setJustAdded] = useState(false);
 
   const selectedValues = useMemo(() => {
-    const values: OptionValue[] = [];
+    const values: { group: OptionGroup; value: OptionValue }[] = [];
     for (const group of product.optionGroups) {
       for (const id of selected[group.id] ?? []) {
-        const v = group.values.find((x) => x.id === id);
-        if (v) values.push(v);
+        const value = group.values.find((candidate) => candidate.id === id);
+        if (value) values.push({ group, value });
       }
     }
     return values;
   }, [selected, product.optionGroups]);
 
-  const unitPrice = product.basePriceMinor + selectedValues.reduce((s, v) => s + v.priceDeltaMinor, 0);
+  const unitPrice =
+    product.basePriceMinor +
+    selectedValues.reduce((sum, entry) => sum + entry.value.priceDeltaMinor, 0);
   const total = unitPrice * quantity;
 
+  const missingRequired = product.optionGroups.filter(
+    (group) => group.required && (selected[group.id] ?? []).length === 0
+  );
+  const canAdd = missingRequired.length === 0;
+
   function toggleValue(group: OptionGroup, valueId: string) {
-    setSelected((prev) => {
-      const current = prev[group.id] ?? [];
-      if (group.multiSelect) {
-        const next = current.includes(valueId)
-          ? current.filter((id) => id !== valueId)
-          : [...current, valueId];
-        return { ...prev, [group.id]: next };
+    setJustAdded(false);
+    setSelected((previous) => {
+      const current = previous[group.id] ?? [];
+      if (!group.multiSelect) {
+        return { ...previous, [group.id]: [valueId] };
       }
-      return { ...prev, [group.id]: [valueId] };
+      if (current.includes(valueId)) {
+        return { ...previous, [group.id]: current.filter((id) => id !== valueId) };
+      }
+      if (group.maxSelect !== null && current.length >= group.maxSelect) {
+        return previous;
+      }
+      return { ...previous, [group.id]: [...current, valueId] };
     });
   }
 
-  function canAdd(): boolean {
-    return product.optionGroups.every((g) => !g.required || (selected[g.id] ?? []).length > 0);
-  }
-
   function handleAdd() {
-    if (!canAdd()) return;
+    if (!canAdd) return;
     addItem({
       productId: product.id,
       slug: product.slug,
       nameAr: product.nameAr,
       nameEn: product.nameEn,
+      imageUrl: product.imageUrl,
       basePriceMinor: product.basePriceMinor,
       quantity,
-      options: selectedValues.map((v) => ({
-        optionValueId: v.id,
-        nameAr: v.nameAr,
-        nameEn: v.nameEn,
-        priceDeltaMinor: v.priceDeltaMinor,
+      options: selectedValues.map(({ group, value }) => ({
+        optionValueId: value.id,
+        groupNameAr: group.nameAr,
+        groupNameEn: group.nameEn,
+        nameAr: value.nameAr,
+        nameEn: value.nameEn,
+        priceDeltaMinor: value.priceDeltaMinor,
       })),
       note: note.trim() || undefined,
     });
-    setAdded(true);
-    setTimeout(() => router.push("/cart"), 500);
+    trackClient("add_to_cart", { productId: product.id, valueMinor: total });
+    setJustAdded(true);
+    router.push("/cart");
   }
 
   return (
     <div className="space-y-6">
-      {product.optionGroups.map((group) => (
-        <fieldset key={group.id} className="rounded-lg border border-border p-4">
-          <legend className="px-1 font-semibold">
-            {locale === "ar" ? group.nameAr : group.nameEn}
-            {group.required && <span className="ms-1 text-xs text-brand">({t.product.required})</span>}
-          </legend>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {group.values.map((value) => {
-              const isSelected = (selected[group.id] ?? []).includes(value.id);
-              return (
-                <button
-                  key={value.id}
-                  type="button"
-                  disabled={!value.available}
-                  onClick={() => toggleValue(group, value.id)}
-                  className={`rounded-full border px-4 py-2 text-sm transition ${
-                    isSelected
-                      ? "border-brand bg-brand text-brand-contrast"
-                      : "border-border bg-surface hover:border-brand"
-                  } ${!value.available ? "cursor-not-allowed opacity-40" : ""}`}
-                >
-                  {locale === "ar" ? value.nameAr : value.nameEn}
-                  {value.priceDeltaMinor > 0 && ` (+${formatMoney(value.priceDeltaMinor, currency, locale)})`}
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
-      ))}
+      {product.optionGroups.map((group) => {
+        const groupSelection = selected[group.id] ?? [];
+        const atLimit =
+          group.multiSelect && group.maxSelect !== null && groupSelection.length >= group.maxSelect;
 
-      <div>
-        <label className="mb-1 block font-semibold">{t.product.quantity}</label>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-            className="h-9 w-9 rounded-full border border-border text-lg"
-          >
-            −
-          </button>
-          <span className="w-6 text-center">{quantity}</span>
-          <button
-            type="button"
-            onClick={() => setQuantity((q) => Math.min(20, q + 1))}
-            className="h-9 w-9 rounded-full border border-border text-lg"
-          >
-            +
-          </button>
-        </div>
-      </div>
+        return (
+          <fieldset key={group.id}>
+            <legend className="mb-2 flex flex-wrap items-baseline gap-2">
+              <span className="font-bold text-ink">
+                {locale === "ar" ? group.nameAr : group.nameEn}
+              </span>
+              <span className="text-xs font-semibold text-ink-muted">
+                {group.required ? `(${t.product.required})` : `(${t.common.optional})`}
+                {" · "}
+                {group.multiSelect ? t.product.chooseMany : t.product.chooseOne}
+              </span>
+            </legend>
 
-      <div>
-        <label className="mb-1 block font-semibold">{t.product.notes}</label>
-        <textarea
+            <div className="flex flex-wrap gap-2" role="group">
+              {group.values.map((value) => {
+                const isSelected = groupSelection.includes(value.id);
+                const disabled = !value.available || (atLimit && !isSelected);
+                return (
+                  <button
+                    key={value.id}
+                    type="button"
+                    disabled={disabled}
+                    aria-pressed={isSelected}
+                    onClick={() => toggleValue(group, value.id)}
+                    className={`inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] border px-4 py-2 text-sm font-semibold transition-colors ${
+                      isSelected
+                        ? "border-brand bg-brand text-brand-ink"
+                        : "border-line-strong bg-surface text-ink hover:border-brand"
+                    } ${disabled ? "cursor-not-allowed opacity-45" : ""}`}
+                  >
+                    {isSelected ? <CheckIcon /> : null}
+                    {locale === "ar" ? value.nameAr : value.nameEn}
+                    {value.priceDeltaMinor !== 0 ? (
+                      <span className={`numeric text-xs ${isSelected ? "" : "text-ink-muted"}`}>
+                        {formatMoneyDelta(value.priceDeltaMinor, currency, locale)}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+        );
+      })}
+
+      <Field label={t.product.notes} htmlFor="product-note">
+        <Textarea
+          id="product-note"
           value={note}
-          onChange={(e) => setNote(e.target.value)}
+          onChange={(event) => setNote(event.target.value)}
           maxLength={200}
           rows={2}
-          className="w-full rounded-lg border border-border bg-surface p-2"
+          placeholder={t.product.notesPlaceholder}
         />
-      </div>
+      </Field>
 
-      <div className="flex items-center justify-between border-t border-border pt-4">
-        <span className="text-lg font-bold">
-          {t.product.total}: {formatMoney(total, currency, locale)}
-        </span>
-        <button
-          type="button"
-          onClick={handleAdd}
-          disabled={!canAdd()}
-          className="rounded-lg bg-brand px-6 py-3 font-bold text-brand-contrast disabled:opacity-50"
-        >
-          {added ? "✓" : t.product.addToCart}
-        </button>
+      <div className="rounded-[var(--radius)] border border-line bg-surface-muted p-4">
+        <div className="mb-4 flex items-center justify-between">
+          <span className="text-sm font-semibold text-ink">{t.product.quantity}</span>
+          <div className="flex items-center gap-1">
+            <QuantityButton
+              label={t.cart.decrease}
+              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+              disabled={quantity <= 1}
+            >
+              <MinusIcon />
+            </QuantityButton>
+            <span className="numeric w-10 text-center text-lg font-bold">{quantity}</span>
+            <QuantityButton
+              label={t.cart.increase}
+              onClick={() => setQuantity((q) => Math.min(MAX_QUANTITY, q + 1))}
+              disabled={quantity >= MAX_QUANTITY}
+            >
+              <PlusIcon />
+            </QuantityButton>
+          </div>
+        </div>
+
+        <div className="mb-4 flex items-baseline justify-between border-t border-line pt-4">
+          <span className="font-bold text-ink">{t.product.total}</span>
+          <span data-testid="product-total" className="numeric text-xl font-extrabold text-brand">
+            {formatMoney(total, currency, locale)}
+          </span>
+        </div>
+
+        <Button onClick={handleAdd} disabled={!canAdd} size="lg" block>
+          {justAdded ? (
+            <>
+              <CheckIcon /> {t.product.added}
+            </>
+          ) : (
+            t.product.addToCart
+          )}
+        </Button>
+
+        {!canAdd ? (
+          <p className="mt-2 text-center text-xs font-semibold text-danger" role="status">
+            {t.product.chooseOne}:{" "}
+            {missingRequired.map((g) => (locale === "ar" ? g.nameAr : g.nameEn)).join("، ")}
+          </p>
+        ) : null}
       </div>
     </div>
+  );
+}
+
+function QuantityButton({
+  children,
+  label,
+  onClick,
+  disabled,
+}: {
+  children: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-pill)] border border-line-strong bg-surface text-ink transition-colors hover:bg-page-elevated disabled:opacity-40"
+    >
+      {children}
+    </button>
   );
 }

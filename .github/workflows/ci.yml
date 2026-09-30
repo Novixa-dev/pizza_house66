@@ -1,0 +1,142 @@
+name: CI
+
+# Pushing to a branch that has an open PR fires both `push` and
+# `pull_request`, which builds every commit twice and burns double the
+# Actions minutes. Each job below is guarded so a branch is built once, by
+# the pull_request event, and pushes only build on the default branch. A
+# skipped job costs nothing.
+on:
+  push:
+  pull_request:
+
+# A newer push to the same branch makes an in-flight run obsolete.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Test-only values. Real secrets live in the deployment environment; nothing
+  # here is used outside this ephemeral runner.
+  DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/pizzahouse_test?schema=public
+  AUTH_SECRET: ci-only-secret-at-least-thirty-two-characters-long
+  NEXT_PUBLIC_APP_URL: http://127.0.0.1:3111
+  SEED_STAFF_PASSWORD: CiTestPassword123!
+
+jobs:
+  # Static checks and unit tests need no database, so they run first and fail
+  # fast — a type error should not wait on a Postgres container to start.
+  static:
+    name: Typecheck, lint, unit tests
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # One source of truth for the Node version: .nvmrc, which Nixpacks
+          # and Vercel read too.
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  # Builds the way a host with NODE_ENV=production does: npm prunes
+  # devDependencies before the build runs, so anything `next build` resolves
+  # has to be a real dependency. Railway failed exactly here — the Tailwind
+  # PostCSS plugin sat in devDependencies and the deploy only worked while a
+  # warm build cache still had it. The normal `npm ci` in every other job
+  # installs everything and cannot see the difference.
+  production-build:
+    name: Production build (no devDependencies)
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --omit=dev
+      - run: npm run build
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pizzahouse_test
+        ports: ["5432:5432"]
+        # Without the health check the first Prisma call races the container's
+        # startup and fails on a connection refused.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # One source of truth for the Node version: .nvmrc, which Nixpacks
+          # and Vercel read too.
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx prisma migrate deploy
+      - run: npm run db:seed
+      - run: npm run test:integration
+
+  e2e:
+    name: End-to-end tests
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pizzahouse_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # One source of truth for the Node version: .nvmrc, which Nixpacks
+          # and Vercel read too.
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx prisma migrate deploy
+      - run: npm run db:seed
+      # The suite runs against a production build, not `next dev` — see
+      # docs/TESTING.md. playwright.config.ts starts the server itself.
+      - run: npm run build
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

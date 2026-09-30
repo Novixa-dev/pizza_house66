@@ -1,13 +1,20 @@
 // Pizza House / Novixa Restaurant — core data model.
+//
 // See docs/DATABASE.md for entity rationale and docs/DECISIONS.md for the
-// SQLite-for-MVP-dev / Postgres-for-production decision.
+// architectural tradeoffs behind it.
+//
+// Conventions used throughout:
+//   *Minor   integer currency units — never floats (docs/PRD.md §60)
+//   *Ar/*En  bilingual content columns; the UI picks one by active locale
+//   snapshot columns on Order* tables freeze purchase-time values so that
+//            later catalog edits never rewrite history (docs/PRD.md §44)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -23,43 +30,86 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   name         String
-  email        String   @unique
+  email        String    @unique
   passwordHash String
   role         Role
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   paymentReviews    PaymentStatusHistory[] @relation("ReviewedBy")
   orderStatusEvents OrderStatusHistory[]   @relation("ChangedBy")
+  auditEntries      AuditLog[]             @relation("AuditActor")
+
+  @@index([role, active])
 }
 
 // ---------------------------------------------------------------------------
 // Restaurant configuration
+//
+// Every restaurant-specific value lives here rather than in code, so the
+// same application can serve a different restaurant by changing data only
+// (docs/PRD.md §89 — "avoid hardcoding Pizza House values into business
+// logic"). This is the seam a future multi-tenant version widens.
 // ---------------------------------------------------------------------------
 
 model Restaurant {
-  id                String   @id @default(cuid())
-  name              String
-  nameAr            String
-  slug              String   @unique
-  currency          String   @default("YER")
-  phone             String?
-  whatsapp          String?
-  addressAr         String?
-  addressEn         String?
-  city              String?
-  instagramUrl      String?
-  defaultPrepMinutes Int     @default(20)
+  id        String  @id @default(cuid())
+  slug      String  @unique
+  name      String
+  nameAr    String
+  taglineAr String?
+  taglineEn String?
+  aboutAr   String?
+  aboutEn   String?
+
+  currency String @default("YER")
+  // IANA timezone. All "HH:mm" business-hour strings and all pickup-slot
+  // arithmetic are interpreted in this zone, independent of the server's
+  // own clock — see src/lib/time.ts and docs/DECISIONS.md.
+  timezone String @default("Asia/Aden")
+
+  phone        String?
+  whatsapp     String?
+  email        String?
+  addressAr    String?
+  addressEn    String?
+  city         String?
+  mapUrl       String?
+  latitude     Float?
+  longitude    Float?
+  instagramUrl String?
+  facebookUrl  String?
+
+  // Ordering rules
+  defaultPrepMinutes   Int     @default(20)
+  slotIntervalMinutes  Int     @default(15)
+  slotCapacity         Int     @default(10)
+  maxScheduleDaysAhead Int     @default(3)
+  minOrderMinor        Int     @default(0)
   onlineOrderingPaused Boolean @default(false)
-  pauseMessageAr    String?
-  pauseMessageEn    String?
-  slotIntervalMinutes Int    @default(15)
-  slotCapacity      Int      @default(10)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  pauseMessageAr       String?
+  pauseMessageEn       String?
+
+  // Bank-transfer payment instructions shown at checkout when that method is
+  // enabled. Kept as data because account details change without a release.
+  bankNameAr   String?
+  bankNameEn   String?
+  bankAccount  String?
+  bankHolderAr String?
+  bankHolderEn String?
+
+  // SEO
+  seoTitleAr       String?
+  seoTitleEn       String?
+  seoDescriptionAr String?
+  seoDescriptionEn String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   businessHours     BusinessHour[]
   scheduleOverrides ScheduleOverride[]
@@ -67,27 +117,37 @@ model Restaurant {
 }
 
 // 0 = Sunday ... 6 = Saturday
+// One trading window. A day has as many rows as it has services: Pizza House
+// bakes pastries 08:00-12:00 and pizza 16:00-23:30 and is shut in between, so
+// a single row per day could not describe it — and the four closed midday
+// hours were bookable because of that.
 model BusinessHour {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   restaurantId String
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   dayOfWeek    Int
-  opensAt      String // "HH:mm"
-  closesAt     String // "HH:mm", may cross midnight (closesAt < opensAt)
-  closed       Boolean  @default(false)
+  opensAt      String // "HH:mm" in the restaurant's timezone
+  closesAt     String // "HH:mm"; may cross midnight (closesAt <= opensAt)
+  closed       Boolean    @default(false)
 
-  @@unique([restaurantId, dayOfWeek])
+  // Opening time completes the key, so a day holds many windows while the same
+  // window still cannot be entered twice.
+  @@unique([restaurantId, dayOfWeek, opensAt])
+  @@index([restaurantId, dayOfWeek])
 }
 
 model ScheduleOverride {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   restaurantId String
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
-  date         DateTime // calendar date, time ignored
-  closed       Boolean  @default(true)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  date         DateTime   @db.Date // calendar date in the restaurant's timezone
+  closed       Boolean    @default(true)
   opensAt      String?
   closesAt     String?
-  reason       String?
+  reasonAr     String?
+  reasonEn     String?
+
+  @@unique([restaurantId, date])
 }
 
 enum PaymentMethodType {
@@ -97,11 +157,12 @@ enum PaymentMethodType {
 }
 
 model PaymentMethodConfig {
-  id           String   @id @default(cuid())
-  restaurantId String
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
-  type         PaymentMethodType
-  enabled      Boolean  @default(true)
+  id             String            @id @default(cuid())
+  restaurantId   String
+  restaurant     Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  type           PaymentMethodType
+  enabled        Boolean           @default(true)
+  sortOrder      Int               @default(0)
   instructionsAr String?
   instructionsEn String?
 
@@ -119,67 +180,159 @@ enum AvailabilityState {
 }
 
 model Category {
-  id        String   @id @default(cuid())
-  slug      String   @unique
-  nameAr    String
-  nameEn    String
-  sortOrder Int      @default(0)
-  active    Boolean  @default(true)
+  id            String  @id @default(cuid())
+  slug          String  @unique
+  nameAr        String
+  nameEn        String
+  descriptionAr String?
+  descriptionEn String?
+  imageUrl      String?
+  icon          String? // small semantic key, resolved to an SVG in the UI
+  sortOrder     Int     @default(0)
+  active        Boolean @default(true)
 
   products Product[]
+
+  @@index([active, sortOrder])
 }
 
 model Product {
-  id           String   @id @default(cuid())
-  slug         String   @unique
-  categoryId   String
-  category     Category @relation(fields: [categoryId], references: [id])
-  nameAr       String
-  nameEn       String
-  descriptionAr String?
-  descriptionEn String?
-  imageUrl     String?
-  basePriceMinor Int    // minor currency units (e.g. YER has no subunit in practice; treat as whole units)
-  availability AvailabilityState @default(AVAILABLE)
-  featured     Boolean  @default(false)
-  sortOrder    Int      @default(0)
-  prepMinutes  Int?     // overrides restaurant default when set
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String            @id @default(cuid())
+  slug           String            @unique
+  categoryId     String
+  category       Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  nameAr         String
+  nameEn         String
+  descriptionAr  String?
+  descriptionEn  String?
+  imageUrl       String?
+  basePriceMinor Int
+  availability   AvailabilityState @default(AVAILABLE)
+  featured       Boolean           @default(false)
+  // Semantic label key ("bestseller" | "new" | "spicy" | "value"), localized
+  // in the UI dictionary rather than stored as display text.
+  badge          String?
+  sortOrder      Int               @default(0)
+  prepMinutes    Int? // overrides the restaurant default when set
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// An uploaded photograph, which takes precedence over `imageUrl`.
+  image ProductImage?
 
   optionGroups ProductOptionGroup[]
   orderItems   OrderItem[]
+  promotions   PromotionProduct[]
+
+  @@index([categoryId, sortOrder])
+  @@index([availability])
+  @@index([featured])
 }
 
-// e.g. "Size", "Crust" — required, single-select
+// A generic option system: "Size" (required, single-select) and "Extras"
+// (optional, multi-select) are the same shape, so the model carries burger
+// sizes or drink variants as readily as pizza crusts — docs/PROJECT_ORIGIN.md §53.
 model ProductOptionGroup {
-  id         String   @id @default(cuid())
-  productId  String
-  product    Product  @relation(fields: [productId], references: [id])
-  nameAr     String
-  nameEn     String
-  required   Boolean  @default(false)
-  multiSelect Boolean @default(false) // true = add-ons style (0..n)
-  sortOrder  Int      @default(0)
+  id          String  @id @default(cuid())
+  productId   String
+  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  nameAr      String
+  nameEn      String
+  required    Boolean @default(false)
+  multiSelect Boolean @default(false)
+  maxSelect   Int? // only meaningful when multiSelect
+  sortOrder   Int     @default(0)
 
   values ProductOptionValue[]
+
+  @@index([productId, sortOrder])
 }
 
 model ProductOptionValue {
-  id            String   @id @default(cuid())
-  groupId       String
-  group         ProductOptionGroup @relation(fields: [groupId], references: [id])
-  nameAr        String
-  nameEn        String
-  priceDeltaMinor Int    @default(0)
-  available     Boolean  @default(true)
-  sortOrder     Int      @default(0)
+  id              String             @id @default(cuid())
+  groupId         String
+  group           ProductOptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  nameAr          String
+  nameEn          String
+  priceDeltaMinor Int                @default(0)
+  available       Boolean            @default(true)
+  sortOrder       Int                @default(0)
 
   orderItemOptions OrderItemOption[]
+
+  @@index([groupId, sortOrder])
 }
 
 // ---------------------------------------------------------------------------
-// Customers
+// Promotions (docs/PRD.md §36 — deliberately simple, not a coupon engine)
+// ---------------------------------------------------------------------------
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+model Promotion {
+  id               String       @id @default(cuid())
+  code             String?      @unique // null = automatic offer, no code needed
+  nameAr           String
+  nameEn           String
+  descriptionAr    String?
+  descriptionEn    String?
+  discountType     DiscountType
+  discountValue    Int // percent (1..100) or minor units, per discountType
+  minOrderMinor    Int          @default(0)
+  maxDiscountMinor Int?
+  startsAt         DateTime?
+  endsAt           DateTime?
+  active           Boolean      @default(true)
+  usageLimit       Int? // total redemptions allowed across all customers
+  usageCount       Int          @default(0)
+  /// How many times one phone number may use this code. Null = unlimited.
+  /// A public code without this is a code one person can spend all day on.
+  perCustomerLimit Int?
+
+  /// Whether the code is advertised, quietly honoured, or only ever reached
+  /// through a grant. An EARNED promotion has no usable shared code: it is a
+  /// template that CouponGrant issues from.
+  visibility PromotionVisibility @default(PUBLIC)
+
+  /// Ordering on the offers page. Lower first.
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products PromotionProduct[]
+  orders   Order[]
+  grants   CouponGrant[]
+
+  @@index([active, startsAt, endsAt])
+  @@index([visibility, active, sortOrder])
+}
+
+enum PromotionVisibility {
+  /// Listed on the offers page for anyone to take.
+  PUBLIC
+  /// Works if you know it; never advertised. For printed flyers and partners.
+  PRIVATE
+  /// Issued per person as a CouponGrant. The promotion's own code is not usable.
+  EARNED
+}
+
+// When empty for a promotion, the promotion applies to the whole order.
+model PromotionProduct {
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([promotionId, productId])
+}
+
+// ---------------------------------------------------------------------------
+// Customers (guest checkout only — no customer passwords in this MVP)
 // ---------------------------------------------------------------------------
 
 model Customer {
@@ -187,8 +340,48 @@ model Customer {
   name      String
   phone     String   @unique
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  orders Order[]
+  // Running count of orders that actually reached the customer's hands.
+  // Denormalized because the loyalty rule reads it on every completion and
+  // the reward has to be decided in the same transaction that completes the
+  // order — counting rows there would race two tills marking up at once.
+  completedOrders Int @default(0)
+
+  orders  Order[]
+  coupons CouponGrant[]
+}
+
+/// A coupon issued to one person, with its own single-use code.
+///
+/// A Promotion is the offer — what comes off, and on what conditions. A grant
+/// is one person's claim on it. Keeping them apart is what lets the same
+/// "1,000 off your next order" reward be handed to a hundred regulars as a
+/// hundred codes that each work once, instead of one code that leaks to a
+/// WhatsApp group and costs the restaurant a hundred thousand rial.
+model CouponGrant {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  /// Why it was issued — "loyalty", "apology", "manual". Localized in the UI.
+  reason    String @default("loyalty")
+  /// Set when the reward is milestone-based, so the customer can be told what
+  /// they did to earn it rather than just finding a code.
+  milestone Int?
+
+  issuedAt  DateTime  @default(now())
+  expiresAt DateTime?
+
+  redeemedAt      DateTime?
+  redeemedOrderId String?   @unique
+  redeemedOrder   Order?    @relation(fields: [redeemedOrderId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, redeemedAt])
+  @@index([promotionId])
 }
 
 // ---------------------------------------------------------------------------
@@ -214,82 +407,115 @@ enum PickupMode {
 }
 
 model Order {
-  id                String   @id @default(cuid())
-  reference         String   @unique // short human-facing code, e.g. PH-4821
-  trackingToken     String   @unique @default(cuid()) // capability token for guest tracking URL
-  customerId        String?
-  customer          Customer? @relation(fields: [customerId], references: [id])
-  guestName         String
-  guestPhone        String
-  notes             String?
+  id            String    @id @default(cuid())
+  reference     String    @unique // short human-facing code, e.g. PH-4821
+  // Capability token for the guest tracking URL. Cryptographically random,
+  // not derived from the reference — docs/PRD.md §41.
+  trackingToken String    @unique
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  guestName     String
+  guestPhone    String
+  notes         String?
 
   pickupMode        PickupMode
   requestedPickupAt DateTime
-  prepMinutes        Int
-  kitchenReleaseAt   DateTime // requestedPickupAt - prepMinutes
+  // Start of the capacity slot this order occupies. Derived from
+  // requestedPickupAt and the restaurant's slot interval so that capacity
+  // counts group orders by window rather than by exact timestamp.
+  slotStartAt       DateTime
+  prepMinutes       Int
+  kitchenReleaseAt  DateTime // requestedPickupAt − prepMinutes
 
-  subtotalMinor      Int
-  discountMinor       Int      @default(0)
-  totalMinor           Int
-  currency             String   @default("YER")
+  subtotalMinor Int
+  discountMinor Int    @default(0)
+  totalMinor    Int
+  currency      String @default("YER")
 
-  status              OrderStatus @default(PENDING)
-  idempotencyKey       String?  @unique
+  promotionId String?
+  promotion   Promotion? @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+  promoCode   String?
 
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  confirmedAt          DateTime?
-  preparingAt          DateTime?
-  readyAt              DateTime?
-  completedAt          DateTime?
-  cancelledAt          DateTime?
+  status         OrderStatus @default(PENDING)
+  idempotencyKey String?     @unique
 
-  items          OrderItem[]
-  statusHistory  OrderStatusHistory[]
-  payment        Payment?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  confirmedAt DateTime?
+  queuedAt    DateTime?
+  preparingAt DateTime?
+  readyAt     DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  /// The single-use coupon spent on this order, if one was.
+  couponGrant CouponGrant?
+
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
+  payment       Payment?
+  notifications Notification[]
+
+  @@index([status, kitchenReleaseAt])
+  @@index([createdAt])
+  @@index([slotStartAt])
+  @@index([guestPhone])
 }
 
 model OrderItem {
-  id             String   @id @default(cuid())
-  orderId        String
-  order          Order    @relation(fields: [orderId], references: [id])
-  productId      String?
-  product        Product? @relation(fields: [productId], references: [id])
-  nameAr         String   // snapshot at purchase time
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // Nullable so a product can be deleted without destroying order history;
+  // the snapshot columns below keep the line readable regardless.
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  nameAr         String // snapshot at purchase time
   nameEn         String
-  unitPriceMinor Int      // snapshot, includes base price only (options priced separately)
+  basePriceMinor Int // snapshot of the product's base price
+  unitPriceMinor Int // base price + selected option deltas
   quantity       Int
   lineTotalMinor Int
   note           String?
 
   options OrderItemOption[]
+
+  @@index([orderId])
 }
 
 model OrderItemOption {
-  id              String   @id @default(cuid())
+  id              String              @id @default(cuid())
   orderItemId     String
-  orderItem       OrderItem @relation(fields: [orderItemId], references: [id])
+  orderItem       OrderItem           @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
   optionValueId   String?
-  optionValue     ProductOptionValue? @relation(fields: [optionValueId], references: [id])
-  nameAr          String   // snapshot
+  optionValue     ProductOptionValue? @relation(fields: [optionValueId], references: [id], onDelete: SetNull)
+  groupNameAr     String
+  groupNameEn     String
+  nameAr          String // snapshot
   nameEn          String
   priceDeltaMinor Int
+
+  @@index([orderItemId])
 }
 
 model OrderStatusHistory {
-  id           String   @id @default(cuid())
-  orderId      String
-  order        Order    @relation(fields: [orderId], references: [id])
-  fromStatus   OrderStatus?
-  toStatus     OrderStatus
-  changedById  String?
-  changedBy    User?    @relation("ChangedBy", fields: [changedById], references: [id])
-  reason       String?
-  createdAt    DateTime @default(now())
+  id          String       @id @default(cuid())
+  orderId     String
+  order       Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus  OrderStatus?
+  toStatus    OrderStatus
+  changedById String?
+  changedBy   User?        @relation("ChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+  reason      String?
+  createdAt   DateTime     @default(now())
+
+  @@index([orderId, createdAt])
 }
 
 // ---------------------------------------------------------------------------
-// Payments
+// Payments — a state machine deliberately separate from order status
+// (docs/PRD.md §19)
 // ---------------------------------------------------------------------------
 
 enum PaymentStatus {
@@ -303,43 +529,148 @@ enum PaymentStatus {
 }
 
 model Payment {
-  id              String   @id @default(cuid())
-  orderId         String   @unique
-  order           Order    @relation(fields: [orderId], references: [id])
+  id              String            @id @default(cuid())
+  orderId         String            @unique
+  order           Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
   method          PaymentMethodType
-  status          PaymentStatus @default(UNPAID)
+  status          PaymentStatus     @default(UNPAID)
   amountMinor     Int
-  currency        String   @default("YER")
+  currency        String            @default("YER")
   referenceNumber String?
-  receiptPath     String?  // stored file path, never publicly exposed
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
+  receipt       PaymentReceipt?
   statusHistory PaymentStatusHistory[]
+
+  @@index([status])
+}
+
+// Receipt bytes live in the database rather than on disk so that the
+// application stays deployable to a read-only/serverless filesystem, and so
+// that access always goes through an authorization check instead of a
+// guessable public URL (docs/PRD.md §42). See docs/DECISIONS.md for the
+// object-storage migration path once volume justifies it.
+/// A photograph of a menu item, uploaded by the restaurant.
+///
+/// The point of this table is that the owner can photograph their own food
+/// and put it on the site without a developer, a deploy, or an account with
+/// an image host. Stock photography of somebody else's pizza is a stand-in,
+/// and every restaurant that can replace it, should.
+///
+/// Stored as bytes beside the receipts rather than on disk: the container's
+/// filesystem is ephemeral on this host, so a file written at runtime is
+/// gone at the next deploy. One database, one backup, nothing to re-upload.
+model ProductImage {
+  id          String  @id @default(cuid())
+  productId   String  @unique
+  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  contentType String
+  byteSize    Int
+  data        Bytes
+  /// Changes on every upload, and rides in the URL, so a replaced photo is
+  /// not served from a cache that still holds the old one.
+  version     String  @default(cuid())
+  originalName String? // sanitized; never used to build a filesystem path
+  uploadedAt  DateTime @default(now())
+}
+
+model PaymentReceipt {
+  id           String   @id @default(cuid())
+  paymentId    String   @unique
+  payment      Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  contentType  String
+  byteSize     Int
+  data         Bytes
+  originalName String? // sanitized; never used to build a filesystem path
+  uploadedAt   DateTime @default(now())
 }
 
 model PaymentStatusHistory {
-  id           String   @id @default(cuid())
+  id           String         @id @default(cuid())
   paymentId    String
-  payment      Payment  @relation(fields: [paymentId], references: [id])
+  payment      Payment        @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   fromStatus   PaymentStatus?
   toStatus     PaymentStatus
   reviewedById String?
-  reviewedBy   User?    @relation("ReviewedBy", fields: [reviewedById], references: [id])
+  reviewedBy   User?          @relation("ReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
   reason       String?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime       @default(now())
+
+  @@index([paymentId, createdAt])
 }
 
 // ---------------------------------------------------------------------------
-// Audit
+// Notifications (docs/PRD.md §54 — recorded first, delivered best-effort;
+// a delivery failure must never roll back the order workflow)
+// ---------------------------------------------------------------------------
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model Notification {
+  id        String              @id @default(cuid())
+  orderId   String?
+  order     Order?              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  channel   NotificationChannel @default(IN_APP)
+  status    NotificationStatus  @default(PENDING)
+  event     String // e.g. "order_ready"
+  titleAr   String
+  titleEn   String
+  bodyAr    String?
+  bodyEn    String?
+  error     String?
+  createdAt DateTime            @default(now())
+  sentAt    DateTime?
+
+  @@index([orderId, createdAt])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Analytics (docs/PRD.md §52) — first-party, no third-party tracker, and no
+// personal data: sessions are an anonymous random id held in a cookie.
+// ---------------------------------------------------------------------------
+
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  name       String
+  sessionId  String?
+  orderId    String?
+  productId  String?
+  valueMinor Int?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([name, createdAt])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Audit (docs/PRD.md §61)
 // ---------------------------------------------------------------------------
 
 model AuditLog {
   id        String   @id @default(cuid())
   actorId   String?
-  action    String
-  entity    String
+  actor     User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorName String? // denormalized so the trail survives staff deletion
+  action    String // e.g. "payment.verify"
+  entity    String // e.g. "Payment"
   entityId  String?
-  metadata  String? // JSON-encoded
+  metadata  Json?
   createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
 }

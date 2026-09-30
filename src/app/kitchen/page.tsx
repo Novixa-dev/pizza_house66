@@ -1,90 +1,88 @@
 import { redirect } from "next/navigation";
-import { getSession, roleCanAccessKitchen } from "@/lib/auth";
+import type { OrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { can } from "@/lib/permissions";
+import { getLocale, pick } from "@/lib/i18n/locale";
+import { getDictionary } from "@/lib/i18n/dictionaries";
+import { getRestaurant } from "@/server/restaurant";
 import { releaseDueOrders } from "@/server/orders";
-import { transitionOrderAction } from "@/server/actions";
-import type { Order, OrderItem } from "@prisma/client";
+import { KITCHEN_BOARD_STATUSES } from "@/lib/order-state";
+import { KitchenBoard } from "@/components/kitchen/board";
 
+export const dynamic = "force-dynamic";
+
+/**
+ * The kitchen display.
+ *
+ * Optimized for one thing: someone with flour on their hands glancing at a
+ * tablet across the room. Big type, three columns, one button per card, no
+ * navigation to get lost in (docs/PRD.md §25).
+ *
+ * `releaseDueOrders()` runs on every load so the board is correct even if the
+ * scheduled job is not configured — the screen that most needs to be right
+ * about timing does not depend on external infrastructure being wired up.
+ */
 export default async function KitchenPage() {
   const session = await getSession();
-  if (!session || !roleCanAccessKitchen(session.role)) {
-    redirect("/admin/login");
-  }
+  if (!session) redirect("/admin/login?next=/kitchen");
+  if (!can(session.role, "kitchen.read")) redirect("/admin");
 
   await releaseDueOrders();
 
-  const orders = await prisma.order.findMany({
-    where: { status: { in: ["QUEUED", "PREPARING", "READY"] } },
-    orderBy: { kitchenReleaseAt: "asc" },
-    include: { items: true },
-  });
+  const locale = await getLocale();
+  const t = getDictionary(locale);
+  const restaurant = await getRestaurant();
+  const now = new Date();
 
-  const columns: { status: "QUEUED" | "PREPARING" | "READY"; title: string; nextStatus: "PREPARING" | "READY" | "COMPLETED"; actionLabel: string }[] = [
-    { status: "QUEUED", title: "Upcoming", nextStatus: "PREPARING", actionLabel: "Start" },
-    { status: "PREPARING", title: "Preparing", nextStatus: "READY", actionLabel: "Mark Ready" },
-    { status: "READY", title: "Ready", nextStatus: "COMPLETED", actionLabel: "Complete" },
-  ];
+  const [board, upcoming] = await Promise.all([
+    prisma.order.findMany({
+      where: { status: { in: KITCHEN_BOARD_STATUSES } },
+      orderBy: [{ requestedPickupAt: "asc" }],
+      include: { items: { include: { options: true } } },
+    }),
+    // Scheduled orders that haven't reached their kitchen-release time yet.
+    // Showing them (greyed, with a countdown) lets the kitchen plan without
+    // tempting anyone to start early (docs/PROJECT_ORIGIN.md §20).
+    prisma.order.findMany({
+      where: { status: "CONFIRMED", kitchenReleaseAt: { gt: now } },
+      orderBy: { kitchenReleaseAt: "asc" },
+      take: 8,
+      include: { items: { include: { options: true } } },
+    }),
+  ]);
+
+  const serialize = (orders: typeof board) =>
+    orders.map((order) => ({
+      id: order.id,
+      reference: order.reference,
+      status: order.status as OrderStatus,
+      guestName: order.guestName,
+      notes: order.notes,
+      requestedPickupAt: order.requestedPickupAt.toISOString(),
+      kitchenReleaseAt: order.kitchenReleaseAt.toISOString(),
+      preparingAt: order.preparingAt?.toISOString() ?? null,
+      readyAt: order.readyAt?.toISOString() ?? null,
+      pickupMode: order.pickupMode,
+      items: order.items.map((item) => ({
+        id: item.id,
+        quantity: item.quantity,
+        name: pick(locale, item.nameAr, item.nameEn),
+        note: item.note,
+        options: item.options.map((option) => pick(locale, option.nameAr, option.nameEn)),
+      })),
+    }));
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      <div className="mb-6 flex items-center justify-between border-b border-border pb-4">
-        <h1 className="text-xl font-bold">Kitchen Display</h1>
-        <form action="/api/auth/logout" method="post">
-          <button type="submit" className="rounded border border-border px-3 py-1 text-sm">
-            Log Out
-          </button>
-        </form>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        {columns.map((col) => {
-          const columnOrders = orders.filter((o) => o.status === col.status);
-          return (
-            <div key={col.status}>
-              <h2 className="mb-3 font-bold">
-                {col.title} ({columnOrders.length})
-              </h2>
-              <div className="space-y-3">
-                {columnOrders.length === 0 && <p className="text-sm text-muted">No orders right now</p>}
-                {columnOrders.map((order) => (
-                  <KitchenCard key={order.id} order={order} nextStatus={col.nextStatus} actionLabel={col.actionLabel} />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function KitchenCard({
-  order,
-  nextStatus,
-  actionLabel,
-}: {
-  order: Order & { items: OrderItem[] };
-  nextStatus: "PREPARING" | "READY" | "COMPLETED";
-  actionLabel: string;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-surface p-3">
-      <div className="mb-1 flex items-center justify-between">
-        <span className="font-bold">{order.reference}</span>
-        <span className="text-xs text-muted">{order.requestedPickupAt.toLocaleTimeString()}</span>
-      </div>
-      <ul className="mb-2 text-sm">
-        {order.items.map((item) => (
-          <li key={item.id}>
-            {item.quantity}× {item.nameEn}
-            {item.note && <span className="text-xs text-muted"> — {item.note}</span>}
-          </li>
-        ))}
-      </ul>
-      <form action={transitionOrderAction.bind(null, order.id, nextStatus, undefined)}>
-        <button type="submit" className="w-full rounded bg-brand px-3 py-1.5 text-sm font-semibold text-brand-contrast">
-          {actionLabel}
-        </button>
-      </form>
-    </div>
+    <KitchenBoard
+      locale={locale}
+      timeZone={restaurant.timezone}
+      staffName={session.name}
+      canUpdate={can(session.role, "kitchen.update")}
+      canOpenAdmin={can(session.role, "dashboard.read")}
+      title={t.kitchen.title}
+      orders={serialize(board)}
+      upcoming={serialize(upcoming)}
+    />
   );
 }
