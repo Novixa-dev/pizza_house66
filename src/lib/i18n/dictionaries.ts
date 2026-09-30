@@ -554,7 +554,11 @@ const ar = {
     funnelProduct: "عرض منتج",
     funnelCart: "إضافة للسلة",
     funnelCheckout: "بدء الدفع",
-    funnelOrders: "طلبات",
+    // Not "طلبات": this chart counts browsing sessions, and an order placed
+    // without one — through the API, or with the cookie blocked — is not in
+    // it. The card above reports the true order count from the orders table.
+    funnelOrders: "زيارات أتمّت الطلب",
+    funnelNote: "يحصي هذا المسار جلسات التصفح. الطلبات القادمة من خارج الموقع غير مشمولة.",
     noData: "لا توجد بيانات كافية لهذه الفترة.",
     repeatCustomers: "عملاء متكررون",
   },
@@ -1182,7 +1186,8 @@ const en: Dictionary = {
     funnelProduct: "Product views",
     funnelCart: "Add to cart",
     funnelCheckout: "Checkout started",
-    funnelOrders: "Orders",
+    funnelOrders: "Visits that ordered",
+    funnelNote: "This funnel counts browsing sessions. Orders placed outside the site are not included.",
     noData: "Not enough data for this period.",
     repeatCustomers: "Repeat customers",
   },

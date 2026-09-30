@@ -92,6 +92,7 @@ export default async function AdminReportsPage({ searchParams }: PageProps<"/adm
           <Card className="p-5">
             {/* A horizontal bar per step. Deliberately plain: this is a
                 restaurant's weekly read, not a BI product. */}
+            <p className="mb-4 text-xs text-ink-muted">{t.reports.funnelNote}</p>
             <ol className="space-y-3">
               {funnelSteps.map((step) => (
                 <li key={step.label}>

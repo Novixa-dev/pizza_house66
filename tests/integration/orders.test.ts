@@ -37,6 +37,19 @@ let restaurantId: string;
 
 /** Removes only rows this suite created. */
 async function cleanup() {
+  // Analytics rows first. AnalyticsEvent.orderId is a plain column, not a
+  // foreign key, so an order's events survive the order — deliberate for a
+  // production history, and a slow leak in a test database.
+  const mine = await prisma.order.findMany({
+    where: { guestPhone: { startsWith: TEST_PHONE_PREFIX } },
+    select: { id: true },
+  });
+  if (mine.length > 0) {
+    await prisma.analyticsEvent.deleteMany({
+      where: { orderId: { in: mine.map((order) => order.id) } },
+    });
+  }
+
   await prisma.order.deleteMany({ where: { guestPhone: { startsWith: TEST_PHONE_PREFIX } } });
   await prisma.customer.deleteMany({
     where: { phone: { startsWith: TEST_PHONE_PREFIX }, orders: { none: {} } },

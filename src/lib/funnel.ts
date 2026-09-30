@@ -49,28 +49,30 @@ export interface FunnelRow {
  * makes the funnel monotonic by construction, and is the truer reading of
  * what the person actually did.
  *
- * Orders with no session id (an API client, a future POS integration) have no
- * journey to attribute, so they are added to the order count alone rather
- * than invented into the steps above it.
+ * A row with no session id is not counted anywhere. An order placed without
+ * a browser session — an API client, a future POS integration, a browser that
+ * blocked the cookie outright — has no journey to place in a funnel of
+ * journeys. Adding it to the bottom step alone was the first thing tried, and
+ * it rebuilt the exact shape this function exists to prevent: with 270 of 377
+ * recorded orders un-sessioned, the bottom bar came out nearly twice the one
+ * above it. A funnel of sessions holds sessions; the true order count belongs
+ * to the orders table, and the reports screen reads it straight from there
+ * for the figure beside this chart.
  */
 export function foldFunnel(rows: FunnelRow[]): FunnelCounts {
   const furthest = new Map<string, number>();
-  let anonymousOrders = 0;
 
   for (const row of rows) {
+    if (!row.sessionId) continue;
     const index = (FUNNEL_STEPS as readonly string[]).indexOf(row.name);
     if (index === -1) continue;
-
-    if (!row.sessionId) {
-      if (row.name === "order_created") anonymousOrders += 1;
-      continue;
-    }
 
     const seen = furthest.get(row.sessionId);
     if (seen === undefined || index > seen) furthest.set(row.sessionId, index);
   }
 
-  // A session sitting at step N counts at every step up to and including N.
+  // A session sitting at step N counts at every step up to and including N,
+  // which is what makes the result monotonic whatever the input looks like.
   const reached = new Array(FUNNEL_STEPS.length).fill(0) as number[];
   for (const index of furthest.values()) {
     for (let step = 0; step <= index; step += 1) reached[step] += 1;
@@ -82,6 +84,6 @@ export function foldFunnel(rows: FunnelRow[]): FunnelCounts {
     productViews: reached[2],
     addToCart: reached[3],
     checkoutStarted: reached[4],
-    orders: reached[5] + anonymousOrders,
+    orders: reached[5],
   };
 }

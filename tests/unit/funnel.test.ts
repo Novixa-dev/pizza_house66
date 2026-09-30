@@ -69,21 +69,47 @@ describe("foldFunnel", () => {
     expect(foldFunnel(backwards)).toEqual(foldFunnel(forwards));
   });
 
-  it("adds a session-less order to the order count alone", () => {
-    // An API client or a future POS integration has no browsing journey to
-    // attribute, so inventing one above it would overstate the top.
-    const result = foldFunnel(session(null, "order_created"));
-    expect(counts(result)).toEqual([0, 0, 0, 0, 0, 1]);
+  it("leaves a session-less order out of the funnel entirely", () => {
+    // A funnel of journeys has nowhere to put an order that had no journey.
+    // Counting it at the bottom step alone was tried first and rebuilt the
+    // very shape this function exists to prevent: on real data 270 of 377
+    // recorded orders were un-sessioned, and the bottom bar came out nearly
+    // twice the one above it. The true order count is the orders table's to
+    // report, and the reports screen reads it from there.
+    expect(counts(foldFunnel(session(null, "order_created")))).toEqual([0, 0, 0, 0, 0, 0]);
   });
 
-  it("ignores session-less events that are not orders", () => {
-    const result = foldFunnel(session(null, "page_view", "add_to_cart"));
+  it("ignores session-less events of every kind", () => {
+    const result = foldFunnel(session(null, "page_view", "add_to_cart", "order_created"));
     expect(counts(result)).toEqual([0, 0, 0, 0, 0, 0]);
   });
 
-  it("ignores an empty-string session id the same way as a missing one", () => {
-    const result = foldFunnel([{ name: "order_created", sessionId: "" }]);
-    expect(counts(result)).toEqual([0, 0, 0, 0, 0, 1]);
+  it("treats an empty-string session id the same way as a missing one", () => {
+    expect(counts(foldFunnel([{ name: "order_created", sessionId: "" }]))).toEqual([
+      0, 0, 0, 0, 0, 0,
+    ]);
+  });
+
+  it("is monotonic for any input at all", () => {
+    // The property, not an example of it: whatever arrives, no step can come
+    // out larger than the step above it.
+    const names = [...FUNNEL_STEPS, "remove_from_cart", "payment_verified"];
+    const rows: FunnelRow[] = [];
+    let seed = 7;
+    const next = (n: number) => (seed = (seed * 1103515245 + 12345) % 2147483648) % n;
+
+    for (let i = 0; i < 400; i += 1) {
+      const withSession = next(4) !== 0;
+      rows.push({
+        name: names[next(names.length)],
+        sessionId: withSession ? `s${next(40)}` : null,
+      });
+    }
+
+    const result = counts(foldFunnel(rows));
+    for (let step = 1; step < result.length; step += 1) {
+      expect(result[step]).toBeLessThanOrEqual(result[step - 1]);
+    }
   });
 
   it("ignores events that are not funnel steps", () => {
