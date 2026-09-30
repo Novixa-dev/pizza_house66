@@ -283,6 +283,11 @@ const ar = {
     lookupRateLimited: "محاولات كثيرة. انتظر قليلًا ثم حاول مجددًا.",
     deviceOnly: "تُحفظ هذه القائمة على جهازك فقط، ولا نشاركها مع أحد.",
     loadingStatuses: "جارِ تحديث الحالات…",
+    reorder: "اطلبه مرة أخرى",
+    reordering: "جارِ التحضير…",
+    reorderEmpty: "لم يعد أي صنف من هذا الطلب متاحًا.",
+    reorderPartial: "أُضيف ما هو متاح. غير متوفر الآن: {items}",
+    reorderDone: "أُضيفت الأصناف إلى سلتك.",
   },
 
   offers: {
@@ -1039,6 +1044,11 @@ const en: Dictionary = {
     lookupRateLimited: "Too many attempts. Wait a moment and try again.",
     deviceOnly: "This list is stored on your device only, and is never shared.",
     loadingStatuses: "Updating statuses…",
+    reorder: "Order this again",
+    reordering: "Adding…",
+    reorderEmpty: "Nothing from that order is still available.",
+    reorderPartial: "Added what we could. No longer available: {items}",
+    reorderDone: "Added to your basket.",
   },
 
   offers: {
