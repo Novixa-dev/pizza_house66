@@ -12,6 +12,7 @@ import { getOrderById } from "@/server/orders";
 import { allowedTransitionsForRole, CUSTOMER_VISIBLE_LABELS, STATUS_TONE } from "@/lib/order-state";
 import { transitionOrderFormAction } from "@/server/actions";
 import { Badge, Card, DescriptionRow, SectionHeading } from "@/components/ui";
+import { ConfirmSubmit } from "@/components/admin/confirm-submit";
 import { ArrowLeftIcon, ReceiptIcon } from "@/components/ui/icons";
 import { PaymentReviewActions } from "@/components/admin/payment-review-actions";
 
@@ -248,8 +249,11 @@ export default async function AdminOrderDetailPage({ params }: PageProps<"/admin
                       <input type="hidden" name="orderId" value={order.id} />
                       <input type="hidden" name="toStatus" value={toStatus} />
                       {isDanger ? <input type="hidden" name="reason" value="cancelled_by_staff" /> : null}
-                      <button
-                        type="submit"
+                      {/* Cancelling is terminal — only a refund follows it in
+                          the state machine — and this button sits one tab stop
+                          from "send to the kitchen now". */}
+                      <ConfirmSubmit
+                        message={isDanger ? t.admin.confirmCancelOrder : ""}
                         className={`min-h-10 rounded-[var(--radius)] px-4 text-sm font-semibold ${
                           isDanger
                             ? "border border-danger text-danger hover:bg-danger-soft"
@@ -263,7 +267,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps<"/admin
                               CUSTOMER_VISIBLE_LABELS[toStatus].ar,
                               CUSTOMER_VISIBLE_LABELS[toStatus].en
                             )}
-                      </button>
+                      </ConfirmSubmit>
                     </form>
                   );
                 })}

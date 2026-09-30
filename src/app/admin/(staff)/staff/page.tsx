@@ -11,6 +11,7 @@ import { Alert, Badge, Card, Checkbox, Field, Input, SectionHeading, Select } fr
 import { InfoIcon, TrashIcon } from "@/components/ui/icons";
 import { SubmitButton } from "@/components/admin/submit-button";
 import { AdminForm } from "@/components/admin/admin-form";
+import { ConfirmSubmit } from "@/components/admin/confirm-submit";
 
 export const dynamic = "force-dynamic";
 
@@ -81,13 +82,13 @@ export default async function AdminStaffPage() {
             {user.id !== session.userId ? (
               <AdminForm locale={locale} action={deleteStaffAction} className="mt-3">
                 <input type="hidden" name="id" value={user.id} />
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-danger hover:underline"
+                <ConfirmSubmit
+                  message={t.admin.confirmDelete}
+                  className="inline-flex min-h-6 items-center gap-1.5 text-sm font-semibold text-danger hover:underline"
                 >
                   <TrashIcon />
                   {t.common.delete}
-                </button>
+                </ConfirmSubmit>
               </AdminForm>
             ) : null}
 

@@ -134,6 +134,47 @@ test.describe("order API integrity", () => {
   });
 });
 
+test.describe("destructive actions ask first", () => {
+  test("cancelling an order needs a confirmation, and declining changes nothing", async ({
+    page,
+  }) => {
+    // Cancelling is terminal in the state machine — only a refund follows it —
+    // and the button sits one tab stop from "send to the kitchen now".
+    await signIn(page, "owner@pizzahouse.local");
+    await page.goto("/admin/orders");
+
+    const firstOrder = page.locator('a[href^="/admin/orders/"]').first();
+    await expect(firstOrder).toBeVisible();
+    await firstOrder.click();
+    await expect(page).toHaveURL(/\/admin\/orders\/[^/]+$/);
+
+    const cancel = page.getByRole("button", { name: /إلغاء الطلب|Cancel order/ });
+    if ((await cancel.count()) === 0) {
+      // Already in a state with no cancel transition — nothing to guard.
+      test.skip();
+      return;
+    }
+
+    const statusBefore = await page.locator("main").innerText();
+
+    let asked: string | null = null;
+    page.on("dialog", async (dialog) => {
+      asked = dialog.message();
+      await dialog.dismiss();
+    });
+    await cancel.click();
+    await page.waitForTimeout(1000);
+
+    // The dialog has to say what is about to happen, not just "are you sure".
+    expect(asked, "no confirmation dialog appeared").not.toBeNull();
+    expect(asked!).toMatch(/لا يمكن التراجع|can't be undone/);
+
+    // Declining leaves the order exactly as it was.
+    await page.reload();
+    expect(await page.locator("main").innerText()).toBe(statusBefore);
+  });
+});
+
 test.describe("kitchen workflow", () => {
   test("the board renders its three lanes", async ({ page }) => {
     await signIn(page, "kitchen@pizzahouse.local");

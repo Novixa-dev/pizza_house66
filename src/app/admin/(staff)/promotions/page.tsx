@@ -9,6 +9,7 @@ import { Badge, Card, Checkbox, EmptyState, Field, Input, SectionHeading, Select
 import { TagIcon, TrashIcon } from "@/components/ui/icons";
 import { SubmitButton } from "@/components/admin/submit-button";
 import { AdminForm } from "@/components/admin/admin-form";
+import { ConfirmSubmit } from "@/components/admin/confirm-submit";
 
 export const dynamic = "force-dynamic";
 
@@ -75,13 +76,13 @@ export default async function AdminPromotionsPage() {
 
                 <AdminForm locale={locale} action={deletePromotionAction} className="mt-4 border-t border-line pt-3">
                   <input type="hidden" name="id" value={promotion.id} />
-                  <button
-                    type="submit"
-                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-danger hover:underline"
-                  >
-                    <TrashIcon />
-                    {t.common.delete}
-                  </button>
+                  <ConfirmSubmit
+                  message={t.admin.confirmDelete}
+                  className="inline-flex min-h-6 items-center gap-1.5 text-sm font-semibold text-danger hover:underline"
+                >
+                  <TrashIcon />
+                  {t.common.delete}
+                </ConfirmSubmit>
                 </AdminForm>
               </Card>
             );

@@ -289,6 +289,7 @@ const ar = {
     orderingPausedBanner: "الطلب عبر الإنترنت متوقف حاليًا.",
     noPermission: "لا تملك صلاحية الوصول إلى هذه الصفحة.",
     confirmDelete: "هل أنت متأكد من الحذف؟ لا يمكن التراجع.",
+    confirmCancelOrder: "سيتم إلغاء هذا الطلب ولا يمكن التراجع. هل تريد المتابعة؟",
   },
 
   dashboard: {
@@ -929,6 +930,7 @@ const en: Dictionary = {
     orderingPausedBanner: "Online ordering is currently paused.",
     noPermission: "You don't have permission to view this page.",
     confirmDelete: "Delete this permanently? This can't be undone.",
+    confirmCancelOrder: "This order will be cancelled and it can't be undone. Continue?",
   },
 
   dashboard: {
