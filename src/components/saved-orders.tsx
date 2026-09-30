@@ -15,7 +15,7 @@ import { reorderAction, summarizeRememberedAction } from "@/server/public-action
 import type { OrderSummary } from "@/server/order-lookup";
 import { formatMoney } from "@/lib/money";
 import { useCart } from "./cart-context";
-import { Alert, Badge, Card, EmptyState } from "./ui";
+import { Alert, Badge, ButtonLink, Card, EmptyState } from "./ui";
 import { AlertIcon, CartIcon, ClockIcon, ListIcon, TrashIcon } from "./ui/icons";
 
 const TONE_TO_BADGE = {
@@ -86,11 +86,7 @@ export function SavedOrders({ locale, timeZone }: { locale: Locale; timeZone: st
         icon={<ListIcon />}
         title={t.track.none}
         description={t.track.noneHint}
-        action={
-          <Link href="/menu" className="font-semibold text-brand underline">
-            {t.common.viewMenu}
-          </Link>
-        }
+        action={<ButtonLink href="/menu">{t.common.viewMenu}</ButtonLink>}
       />
     );
   }
@@ -187,6 +183,10 @@ export function SavedOrders({ locale, timeZone }: { locale: Locale; timeZone: st
           type="button"
           onClick={() => reorder(entry.token)}
           disabled={pending}
+          // The label is hidden below `sm` to keep the row on one line, so
+          // the button needs a name of its own — otherwise a screen reader
+          // on a phone announces "button" and nothing else.
+          aria-label={`${t.track.reorder} ${entry.reference}`}
           className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[var(--radius-sm)] border border-line-strong px-3 text-sm font-semibold text-ink-soft transition-colors hover:border-brand/40 hover:bg-brand-soft hover:text-brand disabled:opacity-60"
         >
           <CartIcon />

@@ -68,7 +68,7 @@ export default async function AboutPage() {
           <h2 className="font-bold text-ink">{t.pages.contactVisit}</h2>
           <p className="mt-1.5 text-ink-soft">{address}</p>
           <p className="mt-4">
-            <Link href="/contact" className="font-semibold text-brand underline underline-offset-4">
+            <Link href="/contact" className="inline-flex min-h-6 items-center font-semibold text-brand underline underline-offset-4">
               {t.pages.contactTitle}
             </Link>
           </p>
