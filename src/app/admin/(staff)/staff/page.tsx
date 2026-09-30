@@ -64,6 +64,7 @@ export default async function AdminStaffPage() {
                   dir="ltr"
                   autoComplete="new-password"
                   minLength={8}
+                  placeholder={t.staff.passwordKeep}
                 />
               </Field>
               <div className="pb-3">
@@ -102,8 +103,9 @@ export default async function AdminStaffPage() {
                   t.staff.never
                 )}
               </span>
-              <span className="numeric text-xs text-ink-muted">
-                · {permissionsFor(user.role).length} permissions
+              <span className="text-xs text-ink-muted">
+                · <span className="numeric">{permissionsFor(user.role).length}</span>{" "}
+                {t.staff.permissionsCount}
               </span>
             </div>
           </Card>

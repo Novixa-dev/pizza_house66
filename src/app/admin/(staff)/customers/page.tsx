@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requirePagePermission } from "@/lib/auth";
 import { getLocale, pick } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionaries";
@@ -23,11 +24,15 @@ export default async function AdminCustomersPage() {
   const locale = await getLocale();
   const t = getDictionary(locale);
   const restaurant = await getRestaurant();
-  const customers = await listCustomers();
+  const { customers, total, shown } = await listCustomers();
 
   return (
     <div className="space-y-6">
-      <SectionHeading level={1} title={t.customers.title} subtitle={`${customers.length}`} />
+      <SectionHeading
+        level={1}
+        title={t.customers.title}
+        subtitle={`${total} ${t.customers.countNoun}`}
+      />
 
       {customers.length === 0 ? (
         <EmptyState title={t.customers.empty} icon={<UsersIcon />} />
@@ -53,7 +58,18 @@ export default async function AdminCustomersPage() {
                       {customer.phone}
                     </a>
                   </td>
-                  <td className="numeric p-3 text-end text-ink-soft">{customer.orderCount}</td>
+                  <td className="p-3 text-end">
+                    {/* Straight through to this customer's orders. The list
+                        already filters on phone number, so the one question
+                        this table raises — "what did they order?" — is a
+                        click rather than a copy-paste into the search box. */}
+                    <Link
+                      href={`/admin/orders?q=${encodeURIComponent(customer.phone)}`}
+                      className="numeric font-semibold text-brand hover:underline"
+                    >
+                      {customer.orderCount}
+                    </Link>
+                  </td>
                   <td className="numeric p-3 text-end font-bold text-ink">
                     {formatMoney(customer.totalSpentMinor, restaurant.currency, locale)}
                   </td>
@@ -71,6 +87,16 @@ export default async function AdminCustomersPage() {
           </table>
         </Card>
       )}
+
+      {shown < total ? (
+        <p className="text-xs text-ink-muted">
+          {pick(
+            locale,
+            `يعرض هذا الجدول أحدث ${shown} عميلًا من أصل ${total}.`,
+            `Showing the ${shown} most recent customers of ${total}.`
+          )}
+        </p>
+      ) : null}
 
       <p className="text-xs text-ink-muted">
         {pick(

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  endOfDateInput,
   formatDate,
   formatDateTime,
   formatHHmm,
@@ -9,7 +10,9 @@ import {
   isSameZonedDay,
   minutesBetween,
   parseHHmm,
+  startOfDateInput,
   startOfZonedDay,
+  toDateInputValue,
   toDateOnly,
   zonedTimeToUtc,
 } from "@/lib/time";
@@ -155,5 +158,69 @@ describe("display formatting digits", () => {
 
   it("still renders English in 24-hour time", () => {
     expect(formatTime(instant, ADEN, "en")).toMatch(/19:15/);
+  });
+});
+
+describe("<input type=\"date\"> round-trip", () => {
+  // The bug: `new Date("2026-01-05")` is midnight **UTC**, so a promotion an
+  // owner in Aden set to end on the 5th stopped working at 03:00 on the 5th —
+  // twenty-one hours early, with the code failing while the poster in the
+  // window still advertised it.
+
+  it("reads a date as the restaurant's own midnight, not UTC's", () => {
+    // 00:00 on the 5th in Aden is 21:00 on the 4th in UTC.
+    expect(startOfDateInput("2026-01-05", ADEN)?.toISOString()).toBe("2026-01-04T21:00:00.000Z");
+  });
+
+  it("treats an end date as running through that whole day", () => {
+    const end = endOfDateInput("2026-01-05", ADEN);
+    // 23:59:59.999 on the 5th in Aden is 20:59:59.999 on the 5th in UTC.
+    expect(end?.toISOString()).toBe("2026-01-05T20:59:59.999Z");
+  });
+
+  it("keeps a promotion alive for the whole of its last day", () => {
+    const end = endOfDateInput("2026-01-05", ADEN)!;
+    // 23:30 Aden on the 5th — the restaurant is still trading.
+    const lateOnTheLastDay = new Date("2026-01-05T20:30:00Z");
+    expect(lateOnTheLastDay.getTime()).toBeLessThan(end.getTime());
+
+    // The naive reading expired it before the restaurant even opened.
+    expect(lateOnTheLastDay.getTime()).toBeGreaterThan(new Date("2026-01-05").getTime());
+  });
+
+  it("gives a one-day window a real day's length", () => {
+    const start = startOfDateInput("2026-01-05", ADEN)!;
+    const end = endOfDateInput("2026-01-05", ADEN)!;
+    expect(end.getTime() - start.getTime()).toBe(24 * 60 * 60 * 1000 - 1);
+  });
+
+  it("still spans a real day where the clocks change", () => {
+    // 29 March 2026 is when British Summer Time starts: that day is 23 hours
+    // long, so a fixed +24h would overshoot into the next day.
+    const start = startOfDateInput("2026-03-29", LONDON)!;
+    const end = endOfDateInput("2026-03-29", LONDON)!;
+    expect(end.getTime() - start.getTime()).toBe(23 * 60 * 60 * 1000 - 1);
+    expect(getZonedParts(end, LONDON).day).toBe(29);
+  });
+
+  it("renders an instant back as the date the restaurant sees", () => {
+    // 21:00Z on the 4th is already the 5th in Aden — the UTC calendar date
+    // would put the wrong day back in the form.
+    expect(toDateInputValue(new Date("2026-01-04T21:00:00Z"), ADEN)).toBe("2026-01-05");
+  });
+
+  it("round-trips a date through the form unchanged", () => {
+    for (const day of ["2026-01-05", "2026-06-30", "2026-12-31"]) {
+      expect(toDateInputValue(startOfDateInput(day, ADEN), ADEN)).toBe(day);
+      expect(toDateInputValue(endOfDateInput(day, ADEN), ADEN)).toBe(day);
+    }
+  });
+
+  it("reads an empty or malformed value as no date at all", () => {
+    expect(toDateInputValue(null, ADEN)).toBe("");
+    for (const bad of ["", "not-a-date", "2026-1-5", "05/01/2026"]) {
+      expect(startOfDateInput(bad, ADEN)).toBeNull();
+      expect(endOfDateInput(bad, ADEN)).toBeNull();
+    }
   });
 });

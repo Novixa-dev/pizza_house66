@@ -295,6 +295,7 @@ const ar = {
     todayOrders: "طلبات اليوم",
     todaySales: "مبيعات اليوم",
     pendingPayments: "مدفوعات بانتظار المراجعة",
+    inKitchen: "في المطبخ",
     preparing: "قيد التحضير",
     ready: "جاهزة للاستلام",
     upcoming: "طلبات مجدولة قادمة",
@@ -311,6 +312,9 @@ const ar = {
 
   orders: {
     title: "الطلبات",
+    // Counting noun, not the page title: Arabic says "١٦ طلبًا", never
+    // "١٦ الطلبات" — a number never takes the definite article after it.
+    countNoun: "طلبًا",
     reference: "رقم الطلب",
     customer: "العميل",
     status: "الحالة",
@@ -378,6 +382,11 @@ const ar = {
     prepMinutes: "مدة التحضير (دقيقة)",
     prepMinutesHint: "اتركه فارغًا لاستخدام المدة الافتراضية للمطعم",
     optionGroups: "مجموعات الخيارات",
+    // The same words counted after a number, and so indefinite: Arabic says
+    // "3 مجموعات خيارات", never "3 مجموعات الخيارات".
+    optionGroupsCount: "مجموعات خيارات",
+    markSoldOut: "تعيين كنافد",
+    markAvailable: "تعيين كمتاح",
     optionGroupName: "اسم المجموعة",
     addOptionGroup: "إضافة مجموعة خيارات",
     addOptionValue: "إضافة خيار",
@@ -431,6 +440,7 @@ const ar = {
 
   customers: {
     title: "العملاء",
+    countNoun: "عميلًا",
     name: "الاسم",
     phone: "الهاتف",
     orderCount: "عدد الطلبات",
@@ -501,7 +511,13 @@ const ar = {
     role: "الدور",
     active: "نشط",
     password: "كلمة المرور",
-    passwordHint: "٨ أحرف على الأقل. اتركها فارغة عند التعديل للإبقاء على كلمة المرور الحالية.",
+    // Short enough to sit under a field in a multi-column row. The
+    // edit-specific half moved into the field's own placeholder, where it is
+    // read at the moment it matters. Western digits, as everywhere else —
+    // see LOCALE_TAG in src/lib/time.ts.
+    passwordHint: "8 أحرف على الأقل.",
+    passwordKeep: "اتركها فارغة للإبقاء على الحالية",
+    permissionsCount: "صلاحية",
     lastLogin: "آخر دخول",
     never: "لم يسجل الدخول",
     empty: "لا يوجد موظفون.",
@@ -561,6 +577,55 @@ const ar = {
     itemsCount: "صنف",
     autoRefresh: "تتحدث تلقائيًا",
     noteLabel: "ملاحظة",
+  },
+
+  // The activity log reads as a record of what a person did, not as a dump of
+  // the keys the code happens to use. The raw key stays visible under each
+  // label, because the point of an audit trail is that it is exact.
+  audit: {
+    subtitle: "آخر {count} عملية إدارية مسجلة.",
+    when: "الوقت",
+    actor: "بواسطة",
+    action: "العملية",
+    entity: "السجل",
+    details: "التفاصيل",
+    entities: {
+      Order: "طلب",
+      Payment: "دفعة",
+      Product: "منتج",
+      Category: "قسم",
+      Promotion: "عرض",
+      Restaurant: "المطعم",
+      User: "موظف",
+    },
+    actions: {
+      "order.transition": "تغيير حالة طلب",
+      "order.cancel": "إلغاء طلب",
+      "payment.verify": "تأكيد دفعة",
+      "payment.reject": "رفض دفعة",
+      "payment.receipt.view": "عرض إيصال",
+      "product.create": "إضافة منتج",
+      "product.update": "تعديل منتج",
+      "product.delete": "حذف منتج",
+      "product.availability": "تغيير توفر منتج",
+      "category.create": "إضافة قسم",
+      "category.update": "تعديل قسم",
+      "category.delete": "حذف قسم",
+      "promotion.create": "إضافة عرض",
+      "promotion.update": "تعديل عرض",
+      "promotion.delete": "حذف عرض",
+      "hours.update": "تعديل أوقات العمل",
+      "hours.override.create": "إضافة استثناء دوام",
+      "hours.override.delete": "حذف استثناء دوام",
+      "settings.update": "تعديل الإعدادات",
+      "payment-method.update": "تعديل طريقة دفع",
+      "ordering.pause": "إيقاف الطلب مؤقتًا",
+      "ordering.resume": "استئناف الطلب",
+      "staff.create": "إضافة موظف",
+      "staff.update": "تعديل موظف",
+      "staff.delete": "حذف موظف",
+      "auth.login": "تسجيل دخول",
+    },
   },
 
   errors: {
@@ -866,6 +931,7 @@ const en: Dictionary = {
     todayOrders: "Orders today",
     todaySales: "Sales today",
     pendingPayments: "Payments awaiting review",
+    inKitchen: "In the kitchen",
     preparing: "Preparing",
     ready: "Ready for pickup",
     upcoming: "Scheduled ahead",
@@ -882,6 +948,7 @@ const en: Dictionary = {
 
   orders: {
     title: "Orders",
+    countNoun: "orders",
     reference: "Order",
     customer: "Customer",
     status: "Status",
@@ -949,6 +1016,9 @@ const en: Dictionary = {
     prepMinutes: "Preparation time (min)",
     prepMinutesHint: "Leave empty to use the restaurant default",
     optionGroups: "Option groups",
+    optionGroupsCount: "option groups",
+    markSoldOut: "Mark sold out",
+    markAvailable: "Mark available",
     optionGroupName: "Group name",
     addOptionGroup: "Add option group",
     addOptionValue: "Add option",
@@ -1002,6 +1072,7 @@ const en: Dictionary = {
 
   customers: {
     title: "Customers",
+    countNoun: "customers",
     name: "Name",
     phone: "Phone",
     orderCount: "Orders",
@@ -1072,7 +1143,9 @@ const en: Dictionary = {
     role: "Role",
     active: "Active",
     password: "Password",
-    passwordHint: "At least 8 characters. Leave empty when editing to keep the current password.",
+    passwordHint: "At least 8 characters.",
+    passwordKeep: "Leave blank to keep the current one",
+    permissionsCount: "permissions",
     lastLogin: "Last login",
     never: "Never signed in",
     empty: "No staff accounts.",
@@ -1132,6 +1205,52 @@ const en: Dictionary = {
     itemsCount: "items",
     autoRefresh: "Updates automatically",
     noteLabel: "Note",
+  },
+
+  audit: {
+    subtitle: "The {count} most recent staff actions.",
+    when: "When",
+    actor: "By",
+    action: "Action",
+    entity: "Record",
+    details: "Details",
+    entities: {
+      Order: "Order",
+      Payment: "Payment",
+      Product: "Product",
+      Category: "Category",
+      Promotion: "Promotion",
+      Restaurant: "Restaurant",
+      User: "Staff member",
+    },
+    actions: {
+      "order.transition": "Order status changed",
+      "order.cancel": "Order cancelled",
+      "payment.verify": "Payment verified",
+      "payment.reject": "Payment rejected",
+      "payment.receipt.view": "Receipt viewed",
+      "product.create": "Product created",
+      "product.update": "Product updated",
+      "product.delete": "Product deleted",
+      "product.availability": "Product availability changed",
+      "category.create": "Category created",
+      "category.update": "Category updated",
+      "category.delete": "Category deleted",
+      "promotion.create": "Promotion created",
+      "promotion.update": "Promotion updated",
+      "promotion.delete": "Promotion deleted",
+      "hours.update": "Opening hours updated",
+      "hours.override.create": "Hours exception added",
+      "hours.override.delete": "Hours exception removed",
+      "settings.update": "Settings updated",
+      "payment-method.update": "Payment method updated",
+      "ordering.pause": "Ordering paused",
+      "ordering.resume": "Ordering resumed",
+      "staff.create": "Staff member added",
+      "staff.update": "Staff member updated",
+      "staff.delete": "Staff member removed",
+      "auth.login": "Signed in",
+    },
   },
 
   errors: {

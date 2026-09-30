@@ -79,7 +79,19 @@ export default async function AdminDashboardPage() {
           tone="info"
           icon={<ClockIcon />}
         />
-        <StatCard label={t.dashboard.preparing} value={String(snapshot.preparing)} tone="warning" icon={<PizzaIcon />} />
+        {/* Queued and preparing together, because a manager wants one number
+            for what the kitchen still owes them. Counting only PREPARING read
+            0 while ten released orders sat unstarted in the queue — the tile
+            row said the restaurant was idle when it was behind. The hint
+            keeps the split visible: lots queued, few preparing, is exactly
+            what "the kitchen is falling behind" looks like. */}
+        <StatCard
+          label={t.dashboard.inKitchen}
+          value={String(snapshot.queued + snapshot.preparing)}
+          hint={`${t.dashboard.preparing}: ${snapshot.preparing}`}
+          tone="warning"
+          icon={<PizzaIcon />}
+        />
         <StatCard label={t.dashboard.ready} value={String(snapshot.ready)} tone="success" icon={<CheckCircleIcon />} />
         <StatCard label={t.dashboard.completedToday} value={String(snapshot.completedToday)} />
         <StatCard

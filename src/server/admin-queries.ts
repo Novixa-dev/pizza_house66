@@ -30,6 +30,7 @@ export interface DashboardSnapshot {
   todaySalesMinor: number;
   avgOrderValueMinor: number;
   pendingPayments: number;
+  queued: number;
   preparing: number;
   ready: number;
   upcomingScheduled: number;
@@ -75,6 +76,7 @@ export async function getDashboardSnapshot(now = new Date()): Promise<DashboardS
     todaySalesMinor: sales,
     avgOrderValueMinor: orders > 0 ? Math.round(sales / orders) : 0,
     pendingPayments,
+    queued: byStatus.get("QUEUED") ?? 0,
     preparing: byStatus.get("PREPARING") ?? 0,
     ready: byStatus.get("READY") ?? 0,
     upcomingScheduled: upcoming,
@@ -84,16 +86,36 @@ export async function getDashboardSnapshot(now = new Date()): Promise<DashboardS
   };
 }
 
+/**
+ * How long an order may sit in a lane before it counts as stalled.
+ *
+ * QUEUED is the sharper of the two: the kitchen release time has already
+ * passed, so every minute a queued order goes unstarted comes out of the
+ * customer's promised pickup time. READY is slower — the food is made and
+ * the wait is on the customer — so it gets longer before it is flagged.
+ */
+const STALLED_AFTER_MINUTES = { queued: 10, ready: 20 } as const;
+
 /** Orders that are blocked on a human right now, newest first. */
-export async function getAttentionQueue(limit = 6) {
+export async function getAttentionQueue(limit = 6, now = new Date()) {
+  const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60 * 1000);
+
   return prisma.order.findMany({
     where: {
       OR: [
         { status: "PAYMENT_PENDING" },
         { status: "PENDING" },
+        // Released to the kitchen but nobody has started it. Without this the
+        // dashboard reported "nothing needs attention" while ten orders sat
+        // unstarted in the queue — the one state where waiting is pure lost
+        // time, and the state the board is least likely to be watched in.
+        {
+          status: "QUEUED",
+          kitchenReleaseAt: { lt: minutesAgo(STALLED_AFTER_MINUTES.queued) },
+        },
         // Ready for longer than 20 minutes: the customer hasn't shown up, or
         // nobody marked it handed over.
-        { status: "READY", readyAt: { lt: new Date(Date.now() - 20 * 60 * 1000) } },
+        { status: "READY", readyAt: { lt: minutesAgo(STALLED_AFTER_MINUTES.ready) } },
       ],
     },
     orderBy: { createdAt: "desc" },
@@ -183,18 +205,24 @@ export async function listRecentlyReviewedPayments(limit = 10) {
 }
 
 export async function listCustomers(limit = 100) {
-  const customers = await prisma.customer.findMany({
-    orderBy: { createdAt: "desc" },
-    take: limit,
-    include: {
-      orders: {
-        select: { totalMinor: true, createdAt: true, status: true },
-        orderBy: { createdAt: "desc" },
+  // `total` is the whole table, not the page: the screen used to print the
+  // length of this capped list as the customer count, so a restaurant with
+  // six hundred regulars was told it had a hundred.
+  const [customers, total] = await Promise.all([
+    prisma.customer.findMany({
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: {
+        orders: {
+          select: { totalMinor: true, createdAt: true, status: true },
+          orderBy: { createdAt: "desc" },
+        },
       },
-    },
-  });
+    }),
+    prisma.customer.count(),
+  ]);
 
-  return customers.map((customer) => {
+  const rows = customers.map((customer) => {
     const billable = customer.orders.filter(
       (order) => !RELEASED_SLOT_STATUSES.includes(order.status)
     );
@@ -208,6 +236,8 @@ export async function listCustomers(limit = 100) {
       lastOrderAt: customer.orders[0]?.createdAt ?? null,
     };
   });
+
+  return { customers: rows, total, shown: rows.length };
 }
 
 export interface ReportRange {

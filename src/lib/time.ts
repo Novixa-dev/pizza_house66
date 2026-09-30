@@ -153,6 +153,57 @@ export function toDateOnly(instant: Date, timeZone: string): Date {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
+/* ---------------------------------------------------------------------------
+   `<input type="date">` round-trip
+
+   The browser hands back a bare "YYYY-MM-DD". `new Date("2026-01-05")` reads
+   that as midnight **UTC** — the one case where JavaScript's date parsing is
+   not local — so a promotion an owner in Aden (UTC+3) set to end on the 5th
+   stopped working at 03:00 on the 5th, twenty-one hours early, with the
+   discount code failing while the restaurant was still advertising it.
+
+   A calendar date only means anything inside a timezone, so these two turn
+   the string into the instant the restaurant means by it, and the third turns
+   an instant back into the date the restaurant's own calendar shows.
+--------------------------------------------------------------------------- */
+
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function parseDateOnly(value: string): { year: number; month: number; day: number } | null {
+  const match = DATE_ONLY.exec(value.trim());
+  if (!match) return null;
+  const [, year, month, day] = match;
+  return { year: Number(year), month: Number(month), day: Number(day) };
+}
+
+/** The first instant of that calendar day in `timeZone`. */
+export function startOfDateInput(value: string, timeZone: string): Date | null {
+  const parts = parseDateOnly(value);
+  if (!parts) return null;
+  return zonedTimeToUtc(parts.year, parts.month, parts.day, 0, 0, timeZone);
+}
+
+/**
+ * The last instant of that calendar day in `timeZone`.
+ *
+ * "Ends on the 5th" means the offer is good all through the 5th, so an end
+ * date is inclusive — anything else silently shortens every promotion by a
+ * day. Computed as the next midnight less a millisecond, so it stays correct
+ * on a day that is not 24 hours long.
+ */
+export function endOfDateInput(value: string, timeZone: string): Date | null {
+  const start = startOfDateInput(value, timeZone);
+  if (!start) return null;
+  return new Date(startOfZonedDay(addDays(start, 1), timeZone).getTime() - 1);
+}
+
+/** An instant as the "YYYY-MM-DD" an `<input type="date">` wants, in `timeZone`. */
+export function toDateInputValue(instant: Date | null, timeZone: string): string {
+  if (!instant) return "";
+  const { year, month, day } = getZonedParts(instant, timeZone);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 // `-u-nu-latn` pins the numbering system to Western-Arabic digits while
 // keeping Arabic month names, weekday names and the ص/م marker.
 //

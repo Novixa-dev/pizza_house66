@@ -76,7 +76,7 @@ export default async function AdminOrdersPage({ searchParams }: PageProps<"/admi
       <SectionHeading
         level={1}
         title={t.orders.title}
-        subtitle={`${result.total} ${t.orders.title.toLowerCase()}`}
+        subtitle={`${result.total} ${t.orders.countNoun}`}
       />
 
       {/* A plain GET form: filters end up in the URL, so a manager can

@@ -1,5 +1,5 @@
 import { requirePagePermission } from "@/lib/auth";
-import { getLocale, pick } from "@/lib/i18n/locale";
+import { getLocale } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getRestaurant } from "@/server/restaurant";
 import { listAuditEntries } from "@/server/audit";
@@ -8,6 +8,17 @@ import { Card, EmptyState, SectionHeading } from "@/components/ui";
 import { ReceiptIcon } from "@/components/ui/icons";
 
 export const dynamic = "force-dynamic";
+
+type Dict = ReturnType<typeof getDictionary>;
+
+/** Falls back to the raw key: a new action must never render as a blank cell. */
+function actionLabel(t: Dict, action: string): string {
+  return (t.audit.actions as Record<string, string>)[action] ?? action;
+}
+
+function entityLabel(t: Dict, entity: string): string {
+  return (t.audit.entities as Record<string, string>)[entity] ?? entity;
+}
 
 /**
  * The activity log (docs/PRD.md §61).
@@ -21,18 +32,15 @@ export default async function AdminAuditPage() {
   const locale = await getLocale();
   const t = getDictionary(locale);
   const restaurant = await getRestaurant();
-  const entries = await listAuditEntries(150);
+  const LIMIT = 150;
+  const entries = await listAuditEntries(LIMIT);
 
   return (
     <div className="space-y-6">
       <SectionHeading
         level={1}
         title={t.admin.audit}
-        subtitle={pick(
-          locale,
-          "آخر ١٥٠ عملية إدارية مسجلة.",
-          "The 150 most recent staff actions."
-        )}
+        subtitle={t.audit.subtitle.replace("{count}", String(LIMIT))}
       />
 
       {entries.length === 0 ? (
@@ -42,11 +50,11 @@ export default async function AdminAuditPage() {
           <table className="w-full min-w-[46rem] text-sm">
             <thead>
               <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">
-                <th className="p-3 text-start font-semibold">{t.orders.placed}</th>
-                <th className="p-3 text-start font-semibold">{t.payments.reviewedBy}</th>
-                <th className="p-3 text-start font-semibold">Action</th>
-                <th className="p-3 text-start font-semibold">Entity</th>
-                <th className="p-3 text-start font-semibold">Details</th>
+                <th className="p-3 text-start font-semibold">{t.audit.when}</th>
+                <th className="p-3 text-start font-semibold">{t.audit.actor}</th>
+                <th className="p-3 text-start font-semibold">{t.audit.action}</th>
+                <th className="p-3 text-start font-semibold">{t.audit.entity}</th>
+                <th className="p-3 text-start font-semibold">{t.audit.details}</th>
               </tr>
             </thead>
             <tbody>
@@ -57,14 +65,26 @@ export default async function AdminAuditPage() {
                   </td>
                   <td className="p-3 text-ink">{entry.actorName ?? "—"}</td>
                   <td className="p-3">
-                    <code className="rounded bg-surface-muted px-1.5 py-0.5 text-xs text-ink-soft">
+                    {/* What happened, in words, with the key that produced it
+                        underneath: the owner reads the first line, and the
+                        second is what makes the entry precise enough to be
+                        worth keeping. */}
+                    <span className="block font-semibold text-ink">
+                      {actionLabel(t, entry.action)}
+                    </span>
+                    <code
+                      dir="ltr"
+                      className="mt-0.5 block text-[11px] text-ink-muted"
+                    >
                       {entry.action}
                     </code>
                   </td>
                   <td className="p-3 text-ink-soft">
-                    {entry.entity}
+                    {entityLabel(t, entry.entity)}
                     {entry.entityId ? (
-                      <span className="numeric block text-[11px] text-ink-muted">{entry.entityId}</span>
+                      <code dir="ltr" className="block text-[11px] text-ink-muted">
+                        {entry.entityId}
+                      </code>
                     ) : null}
                   </td>
                   <td className="p-3">

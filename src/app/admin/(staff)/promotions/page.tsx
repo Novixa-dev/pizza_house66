@@ -3,6 +3,7 @@ import { requirePagePermission } from "@/lib/auth";
 import { getLocale, pick } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getRestaurant } from "@/server/restaurant";
+import { toDateInputValue } from "@/lib/time";
 import { deletePromotionAction, savePromotionAction } from "@/server/admin-actions";
 import { Badge, Card, Checkbox, EmptyState, Field, Input, SectionHeading, Select, Textarea } from "@/components/ui";
 import { TagIcon, TrashIcon } from "@/components/ui/icons";
@@ -10,10 +11,6 @@ import { SubmitButton } from "@/components/admin/submit-button";
 import { AdminForm } from "@/components/admin/admin-form";
 
 export const dynamic = "force-dynamic";
-
-function toDateInput(date: Date | null): string {
-  return date ? date.toISOString().slice(0, 10) : "";
-}
 
 export default async function AdminPromotionsPage() {
   await requirePagePermission("promotions.manage");
@@ -72,6 +69,7 @@ export default async function AdminPromotionsPage() {
                   products={products}
                   locale={locale}
                   currency={restaurant.currency}
+                  timezone={restaurant.timezone}
                   t={t}
                 />
 
@@ -99,6 +97,7 @@ export default async function AdminPromotionsPage() {
           products={products}
           locale={locale}
           currency={restaurant.currency}
+          timezone={restaurant.timezone}
           t={t}
         />
       </Card>
@@ -114,6 +113,7 @@ function PromotionFields({
   products,
   locale,
   currency,
+  timezone,
   t,
 }: {
   promotion: {
@@ -136,6 +136,7 @@ function PromotionFields({
   products: { id: string; nameAr: string; nameEn: string }[];
   locale: "ar" | "en";
   currency: string;
+  timezone: string;
   t: Dict;
 }) {
   const id = promotion?.id ?? "new";
@@ -204,10 +205,10 @@ function PromotionFields({
         </Field>
 
         <Field label={t.promotions.startsAt} htmlFor={`p-start-${id}`}>
-          <Input id={`p-start-${id}`} name="startsAt" type="date" dir="ltr" defaultValue={toDateInput(promotion?.startsAt ?? null)} />
+          <Input id={`p-start-${id}`} name="startsAt" type="date" dir="ltr" defaultValue={toDateInputValue(promotion?.startsAt ?? null, timezone)} />
         </Field>
         <Field label={t.promotions.endsAt} htmlFor={`p-end-${id}`}>
-          <Input id={`p-end-${id}`} name="endsAt" type="date" dir="ltr" defaultValue={toDateInput(promotion?.endsAt ?? null)} />
+          <Input id={`p-end-${id}`} name="endsAt" type="date" dir="ltr" defaultValue={toDateInputValue(promotion?.endsAt ?? null, timezone)} />
         </Field>
         <Field label={t.products.descriptionAr} htmlFor={`p-dar-${id}`} className="lg:col-span-2">
           <Textarea id={`p-dar-${id}`} name="descriptionAr" rows={1} defaultValue={promotion?.descriptionAr ?? ""} />
@@ -219,7 +220,13 @@ function PromotionFields({
           {t.promotions.scope} — {t.promotions.scopeProducts}
         </legend>
         <p className="mb-2 text-xs text-ink-muted">{t.promotions.scopeOrder}</p>
-        <div className="grid max-h-40 gap-1.5 overflow-y-auto rounded-[var(--radius-sm)] border border-line p-3 sm:grid-cols-3">
+        {/* Which products the discount applies to is the most consequential
+            choice on this form, and it was in the smallest box on it: 160px
+            held four and a half rows of a six-row grid, so the list always
+            ended on a sliced line that read as a rendering fault. Tall enough
+            for a full menu at desktop width, still capped for a restaurant
+            with hundreds of products. */}
+        <div className="grid max-h-64 gap-1.5 overflow-y-auto rounded-[var(--radius-sm)] border border-line p-3 sm:grid-cols-3">
           {products.map((product) => (
             <Checkbox
               key={product.id}

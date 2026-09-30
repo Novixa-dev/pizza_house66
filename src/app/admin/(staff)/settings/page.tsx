@@ -222,11 +222,26 @@ export default async function AdminSettingsPage() {
               <AdminForm locale={locale} action={savePaymentMethodAction} className="grid gap-3 lg:grid-cols-4 lg:items-end">
                 <input type="hidden" name="id" value={method.id} />
                 <p className="font-bold text-ink lg:pb-3">{t.paymentMethod[method.type]}</p>
+                {/* Textareas, not single-line inputs: this is a sentence the
+                    customer reads at checkout, and in a one-line field the
+                    owner could only ever see its first few words while
+                    editing it. */}
                 <Field label={t.settings.instructionsAr} htmlFor={`ia-${method.id}`}>
-                  <Input id={`ia-${method.id}`} name="instructionsAr" defaultValue={method.instructionsAr ?? ""} />
+                  <Textarea
+                    id={`ia-${method.id}`}
+                    name="instructionsAr"
+                    rows={2}
+                    defaultValue={method.instructionsAr ?? ""}
+                  />
                 </Field>
                 <Field label={t.settings.instructionsEn} htmlFor={`ie-${method.id}`}>
-                  <Input id={`ie-${method.id}`} name="instructionsEn" dir="ltr" defaultValue={method.instructionsEn ?? ""} />
+                  <Textarea
+                    id={`ie-${method.id}`}
+                    name="instructionsEn"
+                    dir="ltr"
+                    rows={2}
+                    defaultValue={method.instructionsEn ?? ""}
+                  />
                 </Field>
                 <div className="flex items-center gap-3 pb-1">
                   <Checkbox name="enabled" label={t.settings.enabled} defaultChecked={method.enabled} />

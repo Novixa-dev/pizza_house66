@@ -12,6 +12,7 @@ import {
   releaseDueOrders,
   SlotFullError,
 } from "@/server/orders";
+import { getAttentionQueue, getDashboardSnapshot } from "@/server/admin-queries";
 import type { CreateOrderInput } from "@/server/order-schema";
 
 // Integration tests against a real PostgreSQL database (docs/PRD.md §72.2).
@@ -420,5 +421,54 @@ describe("order tracking tokens", () => {
     const order = await createOrder(orderInput());
     const found = await getOrderByTrackingToken(order.trackingToken);
     expect(found?.id).toBe(order.id);
+  });
+});
+
+describe("the dashboard's attention queue", () => {
+  /** Puts an order into a lane directly — the transitions are covered elsewhere. */
+  async function place(status: "QUEUED" | "PREPARING", kitchenReleaseAt: Date) {
+    const order = await createOrder(orderInput());
+    return prisma.order.update({
+      where: { id: order.id },
+      data: { status, kitchenReleaseAt },
+    });
+  }
+
+  const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60 * 1000);
+
+  it("flags an order the kitchen was given but nobody started", async () => {
+    // The bug this covers: the dashboard said "nothing needs attention"
+    // while ten orders had been sitting in the kitchen queue for five days.
+    const stalled = await place("QUEUED", minutesAgo(45));
+
+    const queue = await getAttentionQueue(50);
+    expect(queue.map((order) => order.id)).toContain(stalled.id);
+  });
+
+  it("leaves an order alone that was only just handed to the kitchen", async () => {
+    // Otherwise every order would flag itself the moment it was released,
+    // and a panel that always has something in it says nothing.
+    const fresh = await place("QUEUED", minutesAgo(1));
+
+    const queue = await getAttentionQueue(50);
+    expect(queue.map((order) => order.id)).not.toContain(fresh.id);
+  });
+
+  it("leaves an order alone once the kitchen has started it", async () => {
+    const started = await place("PREPARING", minutesAgo(45));
+
+    const queue = await getAttentionQueue(50);
+    expect(queue.map((order) => order.id)).not.toContain(started.id);
+  });
+
+  it("counts a queued order as work the kitchen still owes", async () => {
+    // The tile read 0 while the queue was full, so the row of counters said
+    // the restaurant was idle when it was behind.
+    const before = await getDashboardSnapshot();
+    await place("QUEUED", minutesAgo(45));
+    const after = await getDashboardSnapshot();
+
+    expect(after.queued).toBe(before.queued + 1);
+    expect(after.queued + after.preparing).toBe(before.queued + before.preparing + 1);
   });
 });

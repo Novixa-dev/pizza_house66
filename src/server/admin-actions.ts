@@ -9,6 +9,8 @@ import { requirePermission } from "@/lib/auth";
 import { ForbiddenError } from "@/lib/permissions";
 import { diffFields, recordAudit, type AuditAction } from "./audit";
 import { restaurantDateToUtc } from "./admin-queries";
+import { getRestaurant } from "./restaurant";
+import { endOfDateInput, startOfDateInput } from "@/lib/time";
 import type { Prisma } from "@prisma/client";
 
 // Catalog, pricing, hours, settings and staff management.
@@ -390,8 +392,11 @@ const promotionSchema = z.object({
   maxDiscountMinor: z
     .union([z.literal(""), moneySchema])
     .transform((value) => (value === "" ? null : value)),
-  startsAt: z.union([z.literal(""), z.coerce.date()]).transform((v) => (v === "" ? null : v)),
-  endsAt: z.union([z.literal(""), z.coerce.date()]).transform((v) => (v === "" ? null : v)),
+  // Kept as the raw "YYYY-MM-DD" the date input produces. `z.coerce.date()`
+  // would read it as midnight UTC, which is a different day from the one the
+  // owner picked — see the window computed in the action below.
+  startsAt: z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]),
+  endsAt: z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]),
   usageLimit: z
     .union([z.literal(""), z.coerce.number().int().min(1).max(1_000_000)])
     .transform((value) => (value === "" ? null : value)),
@@ -427,11 +432,22 @@ export async function savePromotionAction(form: FormData): Promise<ActionState> 
       return { error: "VALIDATION_ERROR", fieldErrors: { endsAt: "before_start" } };
     }
 
+    // A calendar date only means something inside a timezone, and the one
+    // that matters is the restaurant's. "Starts on the 5th" is that day's
+    // first minute there; "ends on the 5th" is its last, because an offer
+    // advertised until a date is good through that date.
+    const { timezone } = await getRestaurant();
+    const data = {
+      ...parsed,
+      startsAt: parsed.startsAt ? startOfDateInput(parsed.startsAt, timezone) : null,
+      endsAt: parsed.endsAt ? endOfDateInput(parsed.endsAt, timezone) : null,
+    };
+
     const productIds = form.getAll("productIds").map(String).filter(Boolean);
 
     const promotion = id
-      ? await prisma.promotion.update({ where: { id }, data: parsed })
-      : await prisma.promotion.create({ data: parsed });
+      ? await prisma.promotion.update({ where: { id }, data })
+      : await prisma.promotion.create({ data });
 
     // Scope is replaced wholesale — simpler to reason about than diffing, and
     // the set is small.

@@ -101,7 +101,7 @@ export default async function AdminProductsPage() {
                             <>
                               {" · "}
                               <span className="numeric">{product._count.optionGroups}</span>{" "}
-                              {t.products.optionGroups}
+                              {t.products.optionGroupsCount}
                             </>
                           ) : null}
                         </p>
@@ -126,11 +126,27 @@ export default async function AdminProductsPage() {
                             />
                             <button
                               type="submit"
+                              /* Named for what it does, not for a state. The
+                                 label used to be the availability word
+                                 itself, so a button reading "Sold out" sat
+                                 beside a badge reading "Available" and it
+                                 took a second look to tell which was the
+                                 control — on the one action taken mid-service,
+                                 where a mis-tap pulls a dish off the menu.
+                                 The product name is in the accessible name
+                                 because a screen-reader user hears these 18
+                                 buttons as a list, out of the context of the
+                                 row they sit in. */
+                              aria-label={`${
+                                product.availability === "AVAILABLE"
+                                  ? t.products.markSoldOut
+                                  : t.products.markAvailable
+                              } — ${pick(locale, product.nameAr, product.nameEn)}`}
                               className="min-h-9 rounded-[var(--radius-sm)] border border-line-strong px-3 text-xs font-bold text-ink-soft hover:bg-surface-muted"
                             >
                               {product.availability === "AVAILABLE"
-                                ? t.availability.SOLD_OUT
-                                : t.availability.AVAILABLE}
+                                ? t.products.markSoldOut
+                                : t.products.markAvailable}
                             </button>
                           </AdminForm>
                         ) : null}
