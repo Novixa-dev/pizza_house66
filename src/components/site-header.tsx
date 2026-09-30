@@ -89,7 +89,7 @@ export async function SiteHeader({
             <button
               type="submit"
               lang={otherLocale(locale)}
-              className="rounded-[var(--radius-sm)] border border-line-strong px-2.5 py-1.5 text-xs font-bold text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink"
+              className="inline-flex min-h-11 items-center rounded-[var(--radius-sm)] border border-line-strong px-2.5 text-xs font-bold text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink"
             >
               {t.common.language}
             </button>
@@ -107,7 +107,12 @@ export async function SiteHeader({
           <Link
             key={link.href}
             href={link.href}
-            className="whitespace-nowrap rounded-[var(--radius-pill)] bg-surface-muted px-3.5 py-1.5 text-xs font-bold text-ink-soft"
+            // `min-h-11` rather than more padding: 44px is what a thumb
+            // actually needs, and these three pills are the whole of the
+            // navigation on the device most customers order from. They
+            // cleared the 24px WCAG floor at 28px — passing is not the same
+            // as comfortable.
+            className="inline-flex min-h-11 items-center whitespace-nowrap rounded-[var(--radius-pill)] bg-surface-muted px-3.5 text-xs font-bold text-ink-soft"
           >
             {link.label}
           </Link>
