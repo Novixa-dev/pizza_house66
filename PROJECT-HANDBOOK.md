@@ -216,7 +216,13 @@ it — which once presented as staff login silently doing nothing.
 re-checks, because a Server Action is a POST endpoint anyone can read from
 the page source.
 
-**11. A reported number names the table it came from.** The orders table is
+**11. A package the production build resolves is a dependency of it.** Not
+a devDependency, whatever it is used for: a host with `NODE_ENV=production`
+prunes those before the build runs. CI has a job that installs the same way,
+because every other job runs a plain `npm ci` and so cannot see this class of
+failure at all.
+
+**12. A reported number names the table it came from.** The orders table is
 the authority on how many orders exist; the analytics table is a lossy
 signal about journeys, and `AnalyticsEvent.orderId` is deliberately not a
 foreign key so history survives a deletion. A chart that mixes the two
@@ -599,6 +605,8 @@ it — not by reading the code. They are listed because the lesson is reusable.
 | Half the activity log in English | A log the owner cannot read is not an audit trail |
 | Payment instructions in a single-line input | The owner could only see the first few words of a sentence the customer reads at checkout |
 | A deploy crash-looped on `P1001` while the database was healthy | A container is up before the private network is. Wait for the dependency; do not race it, and do not wrap the migration itself in the retry |
+| The production build needed a devDependency | `NODE_ENV=production` makes npm prune devDependencies, so `@tailwindcss/postcss` was gone before `next build` ran. It had been wrong since the first deploy and only surfaced when a warm build cache rotated — arriving on an unrelated commit and looking like its fault. "dev" describes who runs a package, not when it is needed |
+| Fixing that did not fix the deploy | Turbopack's `.next/cache` keeps a failed build's state and fails the next build for the original reason after it is gone. Railway persists that directory between deploys, so one failure made every later build fail and no correct commit could ship. A build must be able to recover from its own cache |
 
 Three patterns run through the list. **Anything that depends on the
 environment** — clock, protocol, origin, Node version, timezone, locale —
