@@ -165,7 +165,10 @@ export default async function HomePage() {
             title={t.home.featured}
             subtitle={t.home.featuredSubtitle}
             action={
-              <Link href="/menu" className="text-sm font-bold text-brand hover:underline">
+              <Link
+                href="/menu"
+                className="inline-flex min-h-6 items-center text-sm font-bold text-brand hover:underline"
+              >
                 {t.common.viewMenu}
               </Link>
             }

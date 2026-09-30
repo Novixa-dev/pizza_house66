@@ -74,7 +74,7 @@ export default async function ProductPage({ params }: PageProps<"/product/[slug]
     <div className="container-page py-8">
       <Link
         href="/menu"
-        className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-ink-muted hover:text-brand"
+        className="mb-6 inline-flex min-h-6 items-center gap-2 text-sm font-semibold text-ink-muted hover:text-brand"
       >
         {/* The arrow is mirrored by the document direction, so RTL gets the
             arrow pointing the way "back" actually goes. */}

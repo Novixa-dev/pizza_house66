@@ -285,3 +285,46 @@ test.describe("accessibility — the commitments in docs/DESIGN-SYSTEM.md", () =
     await expect(page.locator("h1")).toHaveCount(1);
   });
 });
+
+test.describe("touch targets — WCAG 2.2 SC 2.5.8", () => {
+  // Every interactive target is at least 24x24 CSS px. An automated
+  // accessibility scan on the deployed site caught three 20px-tall text
+  // links, among them the footer's phone and WhatsApp links — the highest
+  // intent taps on the whole site, and the ones most likely to be reached
+  // for one-handed on a phone.
+  //
+  // The skip link is the one exception: it is 1x1 until focused, which is
+  // how a visually-hidden-until-focused control is supposed to behave.
+
+  const PAGES = ["/", "/menu", "/product/margherita"];
+
+  for (const path of PAGES) {
+    test(`every target on ${path} is at least 24px`, async ({ page }) => {
+      await page.setViewportSize({ width: 414, height: 900 });
+      await page.goto(path);
+
+      const small = await page.evaluate(() => {
+        const out: { text: string; w: number; h: number }[] = [];
+        const nodes = document.querySelectorAll("a, button, input, select, [role=button]");
+        for (const el of Array.from(nodes)) {
+          if (el.closest(".sr-only-focusable")) continue;
+          const rect = el.getBoundingClientRect();
+          if (rect.width === 0 && rect.height === 0) continue;
+          if (getComputedStyle(el).display === "none") continue;
+          if (rect.width >= 24 && rect.height >= 24) continue;
+          out.push({
+            text: (el.textContent || el.getAttribute("aria-label") || "").trim().slice(0, 40),
+            w: Math.round(rect.width),
+            h: Math.round(rect.height),
+          });
+        }
+        return out;
+      });
+
+      expect(
+        small,
+        `targets under 24px: ${small.map((s) => `"${s.text}" ${s.w}x${s.h}`).join(", ")}`
+      ).toEqual([]);
+    });
+  }
+});

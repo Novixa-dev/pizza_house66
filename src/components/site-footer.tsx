@@ -41,19 +41,23 @@ export function SiteFooter({
           <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-ink-muted">
             {t.common.menu}
           </h2>
+          {/* These read as plain text links, but they are targets, and a
+              14px line box is 18px tall in English. They only cleared 24px in
+              Arabic because [dir="rtl"] sets line-height 1.75 — accessible in
+              one language and not the other, which is not accessible. */}
           <ul className="space-y-2 text-sm">
             <li>
-              <Link href="/menu" className="text-ink-soft hover:text-brand">
+              <Link href="/menu" className="inline-flex min-h-6 items-center text-ink-soft hover:text-brand">
                 {t.common.viewMenu}
               </Link>
             </li>
             <li>
-              <Link href="/#offers" className="text-ink-soft hover:text-brand">
+              <Link href="/#offers" className="inline-flex min-h-6 items-center text-ink-soft hover:text-brand">
                 {t.common.offers}
               </Link>
             </li>
             <li>
-              <Link href="/#faq" className="text-ink-soft hover:text-brand">
+              <Link href="/#faq" className="inline-flex min-h-6 items-center text-ink-soft hover:text-brand">
                 {t.home.faqTitle}
               </Link>
             </li>
@@ -78,6 +82,11 @@ export function SiteFooter({
           <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-ink-muted">
             {t.common.contactUs}
           </h2>
+          {/* `min-h-6` on each link, not padding: these are the highest-intent
+              taps on the site — a customer calling the restaurant — and a
+              bare 14px text link renders a 20px-tall target, under the 24px
+              WCAG 2.2 floor (SC 2.5.8). Asserted in
+              tests/e2e/accessibility.spec.ts so it cannot drift back. */}
           <ul className="space-y-2.5 text-sm">
             {address ? (
               <li className="flex items-start gap-2 text-ink-soft">
@@ -87,7 +96,7 @@ export function SiteFooter({
             ) : null}
             {tel ? (
               <li>
-                <a href={tel} className="flex items-center gap-2 text-ink-soft hover:text-brand">
+                <a href={tel} className="flex min-h-6 items-center gap-2 text-ink-soft hover:text-brand">
                   <PhoneIcon className="shrink-0 text-base text-brand" />
                   <span className="numeric">{restaurant.phone}</span>
                 </a>
@@ -99,7 +108,7 @@ export function SiteFooter({
                   href={whatsapp}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-2 text-ink-soft hover:text-accent"
+                  className="flex min-h-6 items-center gap-2 text-ink-soft hover:text-accent"
                 >
                   <WhatsappIcon className="shrink-0 text-base text-accent" />
                   {t.common.whatsapp}
@@ -112,7 +121,7 @@ export function SiteFooter({
                   href={restaurant.instagramUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-2 text-ink-soft hover:text-brand"
+                  className="flex min-h-6 items-center gap-2 text-ink-soft hover:text-brand"
                 >
                   <InstagramIcon className="shrink-0 text-base" />
                   Instagram
