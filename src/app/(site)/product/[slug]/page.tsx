@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getLocale, pick } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionaries";
+import { describeDuration } from "@/lib/duration";
 import { getRestaurant } from "@/server/restaurant";
 import { absoluteUrl } from "@/lib/site";
 import { Alert, Badge, ButtonLink } from "@/components/ui";
@@ -124,8 +125,7 @@ export default async function ProductPage({ params }: PageProps<"/product/[slug]
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Badge tone="neutral">
               <ClockIcon />
-              {t.product.prepTime}: <span className="numeric">{prepMinutes}</span>{" "}
-              {t.common.minutes}
+              {t.product.prepTime}: {describeDuration(prepMinutes, locale)}
             </Badge>
             {product.optionGroups.length > 0 ? (
               <Badge tone="info">{t.menu.customizable}</Badge>

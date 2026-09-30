@@ -7,6 +7,7 @@ import { useCart, lineTotalMinor } from "./cart-context";
 import { trackClient } from "./analytics-tracker";
 import { formatMoney } from "@/lib/money";
 import { getDictionary, type Locale } from "@/lib/i18n/dictionaries";
+import { describeDuration } from "@/lib/duration";
 import { Alert, Button, ButtonLink, Card, EmptyState, Field, Input, SectionHeading, Textarea } from "./ui";
 import { AlertIcon, CartIcon, CheckIcon, ClockIcon, ReceiptIcon, TagIcon } from "./ui/icons";
 
@@ -349,7 +350,7 @@ export function CheckoutForm({
                   // roughly the prep time, which would be hours out.
                   !openNow && earliestPickupLabel
                     ? `${t.checkout.pickupAsapClosedHint} · ${earliestPickupLabel}`
-                    : `${t.checkout.pickupAsapHint} · ~${defaultPrepMinutes} ${t.common.minutes}`
+                    : `${t.checkout.pickupAsapHint} · ~${describeDuration(defaultPrepMinutes, locale)}`
                 }
                 icon={<ClockIcon />}
                 name="pickup-mode"

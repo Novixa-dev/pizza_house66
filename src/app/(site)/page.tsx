@@ -3,6 +3,7 @@ import Image from "next/image";
 import { prisma } from "@/lib/db";
 import { getLocale, pick } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionaries";
+import { describeDuration } from "@/lib/duration";
 import { getRestaurant, restaurantStatus } from "@/server/restaurant";
 import { getAutomaticPromotions } from "@/server/orders";
 import { formatMoney } from "@/lib/money";
@@ -102,7 +103,7 @@ export default async function HomePage() {
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <ClockIcon />
-                <span className="numeric">{restaurant.defaultPrepMinutes}</span> {t.common.minutes}
+                {describeDuration(restaurant.defaultPrepMinutes, locale)}
               </span>
               {restaurant.city ? (
                 <span className="inline-flex items-center gap-1.5">

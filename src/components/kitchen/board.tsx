@@ -8,6 +8,7 @@ import type { OrderStatus, PickupMode } from "@prisma/client";
 import { transitionOrderAction } from "@/server/actions";
 import { getDictionary, type Locale } from "@/lib/i18n/dictionaries";
 import { formatTime } from "@/lib/time";
+import { describeDuration } from "@/lib/duration";
 import { Badge } from "../ui";
 import { AlertIcon, CheckIcon, ClockIcon, LogoutIcon, PlayIcon, SettingsIcon } from "../ui/icons";
 
@@ -186,8 +187,8 @@ export function KitchenBoard({
                     </span>
                   </div>
                   <p className="text-xs font-semibold text-gold">
-                    {t.kitchen.startsIn} <span className="numeric">{startsInMinutes}</span>{" "}
-                    {t.common.minutes}
+                    {t.kitchen.startsIn}{" "}
+                    {describeDuration(startsInMinutes, locale)}
                   </p>
                   <ul className="mt-2 space-y-0.5 text-sm text-ink-soft">
                     {order.items.slice(0, 3).map((item) => (
@@ -280,13 +281,14 @@ function TicketCard({
           {late ? (
             <Badge tone="danger">
               <AlertIcon />
-              {t.kitchen.late} <span className="numeric">{Math.abs(minutesToPickup)}</span>
+              {t.kitchen.late}{" "}
+              {describeDuration(Math.abs(minutesToPickup), locale)}
             </Badge>
           ) : dueSoon ? (
             <Badge tone="warning">{t.kitchen.dueNow}</Badge>
           ) : (
             <span className="text-xs text-ink-muted">
-              <span className="numeric">{minutesToPickup}</span> {t.common.minutes}
+              {describeDuration(minutesToPickup, locale)}
             </span>
           )}
         </div>
@@ -321,7 +323,8 @@ function TicketCard({
       <div className="flex items-center justify-between gap-3">
         {elapsedMinutes !== null ? (
           <span className="text-xs font-semibold text-ink-muted">
-            {t.kitchen.elapsed} <span className="numeric">{elapsedMinutes}</span> {t.common.minutes}
+            {t.kitchen.elapsed}{" "}
+            {describeDuration(elapsedMinutes, locale)}
           </span>
         ) : (
           <span />

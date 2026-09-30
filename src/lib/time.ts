@@ -213,7 +213,7 @@ export function toDateInputValue(instant: Date | null, timeZone: string): string
 // `src/lib/money.ts` for choosing Western digits applies at least as strongly
 // here: pickup times sit in scannable columns that staff read at a glance
 // and compare against a clock.
-const LOCALE_TAG = { ar: "ar-YE-u-nu-latn", en: "en-GB" } as const;
+export const LOCALE_TAG = { ar: "ar-YE-u-nu-latn", en: "en-GB" } as const;
 
 /** Localized time of day, e.g. "7:30 م" / "19:30", rendered in restaurant time. */
 export function formatTime(instant: Date, timeZone: string, locale: "ar" | "en"): string {
