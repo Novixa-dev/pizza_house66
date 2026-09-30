@@ -306,13 +306,16 @@ wherever it matches the surface — a brand ring on the brand-coloured skip
 link measured exactly 1.00:1. `--focus-ring` plus a `--focus-halo` box-shadow
 guarantees one of the two always contrasts.
 
-**Every target gets an explicit 24px floor.** A bare text link's hit box is
+**Every target gets an explicit 24px floor, and a thumb-sized one where a
+thumb lands.** A bare text link's hit box is
 whatever its line box happens to be, which is 18px at `text-sm` in English.
 Three footer links cleared the WCAG 2.2 floor (SC 2.5.8) only because
 `[dir="rtl"]` sets line-height 1.75 — accessible in Arabic and not in
 English, from the same markup. Give an interactive element `min-h-6` with
 centred content rather than inheriting a size by accident. Asserted for
 every link, button, input and select in `tests/e2e/accessibility.spec.ts`.
+Primary controls on a phone get `min-h-11` (44px) instead — passing the AA
+floor is not the same as being comfortable to hit.
 
 **Numbers a person reads go through `Intl`, never through concatenation.**
 Money, times, dates and durations each have a formatter, and all four pin
@@ -544,6 +547,16 @@ link or a button; all 22 keyboard stops carry a ring and a halo when tabbed
 to. Its `alt=""` finding was wrong on the standard: that is how an image is
 marked decorative. **A scanner's finding is a lead, not a verdict** — each
 one is worth the measurement it takes to confirm.
+
+Its own rescan then closed the loop: the touch-target finding dropped from
+🔴 SC 2.5.8 (24px, AA) to 🔵 SC 2.5.5 (44px, AAA), which is independent
+confirmation that the fix reached the live site. The remaining AAA
+suggestion was taken only where it earns its keep — the mobile nav pills and
+the language toggle, the whole of the navigation on a phone, went from 28px
+to 44px. The footer's text links stay at 24px: they are read rather than
+aimed at, and making every line of text 44px tall would cost more than it
+buys. The reply on the PR records all of this with the measurements, so the
+disagreement is checkable rather than asserted.
 
 ---
 
