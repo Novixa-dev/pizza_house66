@@ -15,6 +15,15 @@ export function appUrl(): string {
   const deployment = process.env.VERCEL_URL;
   if (deployment) return `https://${deployment}`;
 
+  // Railway sets this on every service that has a domain. Reading it costs
+  // nothing and closes a failure that is invisible in the browser: with no
+  // configured URL, the deployed site advertised `og:url` as
+  // http://localhost:3000 — so every link shared to WhatsApp resolved to the
+  // sharer's own machine. Nothing on the page looks wrong; the damage is all
+  // in the metadata, which is exactly why it went unnoticed.
+  const railway = process.env.RAILWAY_PUBLIC_DOMAIN;
+  if (railway) return `https://${railway}`;
+
   return "http://localhost:3000";
 }
 

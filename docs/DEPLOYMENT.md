@@ -186,6 +186,43 @@ CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
 Set `output: "standalone"` in `next.config.ts` first if you want a smaller
 image; the app does not otherwise care.
 
+## Automatic deployment
+
+`.github/workflows/deploy.yml` ships `main` to Railway **after** CI has passed
+on that same commit.
+
+The gate is the point. Railway's own GitHub integration deploys every push to
+the connected branch with no idea whether the tests passed, which is fine
+until the evening a broken commit lands during service and the ordering page
+goes down with a full kitchen. The workflow waits for all four CI jobs by
+name, deploys only on success, and then polls the live URL until it answers
+200 — a deploy that "succeeded" but left the site down is not a success.
+
+To turn it on:
+
+1. Railway → the project → **Settings → Tokens** → create a project token.
+2. GitHub → the repo → **Settings → Secrets and variables → Actions** → add it
+   as `RAILWAY_TOKEN`.
+3. Railway → the `app` service → **Settings → Source** → turn **off** automatic
+   deploys for `main`. Leave it on and both paths deploy, so the gate buys
+   nothing.
+
+`workflow_dispatch` runs it by hand, with a `skip_ci_gate` input for the
+evening something has to go out and CI is having a bad day. Reach for it
+knowing what you are skipping.
+
+## The public URL
+
+`NEXT_PUBLIC_APP_URL` is what every canonical link, Open Graph tag, sitemap
+entry and order-tracking link is built from. It was unset in production, and
+nothing on the page looked wrong: the site advertised `og:url` as
+`http://localhost:3000`, so every link shared to WhatsApp resolved to the
+sharer's own machine. It is set now, and `src/lib/site.ts` also falls back to
+Railway's `RAILWAY_PUBLIC_DOMAIN` so a fresh environment cannot repeat it.
+
+Set it explicitly anyway once a real domain exists — the fallback knows the
+`*.up.railway.app` hostname, not `pizzahouse66.ye`.
+
 ## Rollback
 
 Application rollback is the host's redeploy of a previous build. **Database
