@@ -2,7 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/db";
 import type { BusinessHourRule, SchedulingConfig, ScheduleOverrideRule } from "@/lib/scheduling";
-import { isOpenNow, resolveOpenWindow } from "@/lib/scheduling";
+import { currentOrNextWindow, isOpenNow } from "@/lib/scheduling";
 import { addDays } from "@/lib/time";
 import type { Prisma } from "@prisma/client";
 
@@ -25,7 +25,7 @@ export class RestaurantNotConfiguredError extends Error {
 export async function getRestaurant(): Promise<RestaurantWithConfig> {
   const restaurant = await prisma.restaurant.findFirst({
     include: {
-      businessHours: { orderBy: { dayOfWeek: "asc" } },
+      businessHours: { orderBy: [{ dayOfWeek: "asc" }, { opensAt: "asc" }] },
       // Only overrides that can still affect a bookable date matter; older
       // ones would just grow the payload on every page render.
       scheduleOverrides: {
@@ -86,7 +86,9 @@ export function restaurantStatus(
 ): RestaurantStatus {
   const config = schedulingConfigFor(restaurant);
   const open = isOpenNow(now, config.hours, config.overrides, config.timeZone);
-  const window = resolveOpenWindow(now, config.hours, config.overrides, config.timeZone);
+  // The window we are in, or the next one to open — not simply the day's
+  // first, which between two services is already over.
+  const window = currentOrNextWindow(now, config.hours, config.overrides, config.timeZone);
   return {
     open,
     acceptingOrders: !restaurant.onlineOrderingPaused,

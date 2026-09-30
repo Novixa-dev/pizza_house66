@@ -7,6 +7,8 @@ import { formatDate } from "@/lib/time";
 import {
   addScheduleOverrideAction,
   deleteScheduleOverrideAction,
+  DEFAULT_SESSIONS,
+  SESSIONS_PER_DAY,
   saveBusinessHoursAction,
 } from "@/server/admin-actions";
 import { Alert, Card, Checkbox, Field, Input, SectionHeading } from "@/components/ui";
@@ -27,7 +29,13 @@ export default async function AdminHoursPage() {
     orderBy: { date: "asc" },
   });
 
-  const byDay = new Map(restaurant.businessHours.map((hour) => [hour.dayOfWeek, hour]));
+  // A day holds one row per service, earliest first, so the form's two slots
+  // fill from that order rather than from a single row per day.
+  const byDay = new Map<number, typeof restaurant.businessHours>();
+  for (const hour of restaurant.businessHours) {
+    if (hour.closed) continue;
+    byDay.set(hour.dayOfWeek, [...(byDay.get(hour.dayOfWeek) ?? []), hour]);
+  }
 
   return (
     <div className="space-y-6">
@@ -44,39 +52,52 @@ export default async function AdminHoursPage() {
       <Card className="p-5">
         <AdminForm locale={locale} action={saveBusinessHoursAction} className="space-y-3">
           {Array.from({ length: 7 }, (_, dayOfWeek) => {
-            const hour = byDay.get(dayOfWeek);
+            const sessions = byDay.get(dayOfWeek) ?? [];
             return (
-              <div
-                key={dayOfWeek}
-                className="grid items-end gap-3 border-b border-line pb-3 last:border-0 sm:grid-cols-4"
-              >
-                <p className="font-semibold text-ink sm:pb-3">{t.hours.days[dayOfWeek]}</p>
-                <Field label={t.hours.opens} htmlFor={`opensAt-${dayOfWeek}`}>
-                  <Input
-                    id={`opensAt-${dayOfWeek}`}
-                    name={`opensAt-${dayOfWeek}`}
-                    type="time"
-                    dir="ltr"
-                    defaultValue={hour?.opensAt ?? "16:00"}
-                  />
-                </Field>
-                <Field label={t.hours.closes} htmlFor={`closesAt-${dayOfWeek}`}>
-                  <Input
-                    id={`closesAt-${dayOfWeek}`}
-                    name={`closesAt-${dayOfWeek}`}
-                    type="time"
-                    dir="ltr"
-                    defaultValue={hour?.closesAt ?? "00:00"}
-                  />
-                </Field>
-                <div className="pb-3">
-                  <Checkbox
-                    name={`closed-${dayOfWeek}`}
-                    label={t.hours.closed}
-                    defaultChecked={hour?.closed ?? false}
-                  />
-                </div>
-              </div>
+              <fieldset key={dayOfWeek} className="border-b border-line pb-4 last:border-0">
+                <legend className="mb-2 font-semibold text-ink">{t.hours.days[dayOfWeek]}</legend>
+
+                {Array.from({ length: SESSIONS_PER_DAY }, (_, session) => {
+                  const hour = sessions[session];
+                  const key = `${dayOfWeek}-${session}`;
+                  return (
+                    <div
+                      key={session}
+                      className="mb-2 grid items-end gap-3 last:mb-0 sm:grid-cols-4"
+                    >
+                      <p className="text-sm text-ink-muted sm:pb-3">{t.hours.sessions[session]}</p>
+                      <Field label={t.hours.opens} htmlFor={`opensAt-${key}`}>
+                        <Input
+                          id={`opensAt-${key}`}
+                          name={`opensAt-${key}`}
+                          type="time"
+                          dir="ltr"
+                          defaultValue={hour?.opensAt ?? DEFAULT_SESSIONS[session].opensAt}
+                        />
+                      </Field>
+                      <Field label={t.hours.closes} htmlFor={`closesAt-${key}`}>
+                        <Input
+                          id={`closesAt-${key}`}
+                          name={`closesAt-${key}`}
+                          type="time"
+                          dir="ltr"
+                          defaultValue={hour?.closesAt ?? DEFAULT_SESSIONS[session].closesAt}
+                        />
+                      </Field>
+                      <div className="pb-3">
+                        {/* Ticked means this service does not run that day —
+                            Friday has no morning shift, and that is a row the
+                            table should not hold at all. */}
+                        <Checkbox
+                          name={`closed-${key}`}
+                          label={t.hours.sessionOff}
+                          defaultChecked={!hour}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </fieldset>
             );
           })}
           <SubmitButton label={t.common.save} />

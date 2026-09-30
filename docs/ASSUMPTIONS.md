@@ -1,36 +1,51 @@
 # Assumptions Requiring Owner Confirmation
 
-Every value below is a placeholder chosen to make the platform demonstrable.
-**None of it is verified against the real Pizza House.**
-`docs/RESTAURANT_DISCOVERY.md` records what could and could not be confirmed
-and why.
+Most of what this platform shows is now the **real Pizza House 66**, taken
+from the restaurant's own published listing and its Instagram profile —
+`docs/RESTAURANT_DISCOVERY.md` records where each value came from and how it
+was verified. This document is now the short list of what is still a guess.
 
 All of it is **data, not code** — every entry is editable from the admin
 panel without a developer or a deployment. That was a design goal, not a
 convenience.
 
+## Confirmed against the client's own listing
+
+These were placeholders and are not any more. Listed so nobody re-confirms
+work that is already done, and so a discrepancy is noticed rather than
+assumed to be a known gap.
+
+| Area | What is used now | Source |
+|---|---|---|
+| Restaurant name | بيتزا هاوس 66 / Pizza House 66 | Client listing and Instagram handle |
+| Menu and prices | 16 items in 5 categories, YER prices from 400 to 5,500 | Client's published menu |
+| Business hours | 08:00–12:00 and 16:00–23:30 daily; **Friday evening only** | Client's published hours |
+| Phone | `05375561` (landline) | Client listing |
+| WhatsApp | `+967 772207788` | Client listing |
+| Address | حضرموت، المكلا، فوه، حي المساكن — near Al Nour clinic, Al Ahgaff University and Al Sallal school | Client listing |
+| Instagram | `@pizza_house66` | Client's profile |
+| Transfer payment | Kuraimi / Al-Omqi / Al-Basiri wallets, number `772207788` | Client listing |
+
+## Still unconfirmed
+
 | Area | What is currently used | Where it lives | Confirm before launch |
 |---|---|---|---|
-| Menu, prices, descriptions | An illustrative menu of pizzas, sides, drinks and desserts with YER prices | `prisma/seed.ts` → editable in **Products** | **Yes** |
-| Categories | Pizzas, sides, drinks, desserts | `prisma/seed.ts` → **Categories** | **Yes** |
-| Business hours | 16:00–00:00 daily, no weekly closure | `prisma/seed.ts` → **Hours** | **Yes**, including any day off |
-| Preparation times | 20 min default; 2–5 min for drinks and desserts | Per product → **Products** | **Yes** — the scheduling promise depends on these |
+| Preparation times | 20 min default; 1–8 min for drinks, sides and desserts | Per product → **Products** | **Yes** — the scheduling promise depends on these |
 | Slot interval | 15 minutes | `Restaurant.slotIntervalMinutes` → **Settings** | Probably fine; confirm |
 | Slot capacity | 10 orders per 15-minute window | `Restaurant.slotCapacity` → **Settings** | **Yes** — this is what protects the kitchen |
 | Booking horizon | 3 days ahead | `Restaurant.maxScheduleDaysAhead` → **Settings** | Confirm |
 | Minimum order | 0 (none) | `Restaurant.minOrderMinor` → **Settings** | Confirm |
-| Currency | YER, treated as having no practical subunit | `Restaurant.currency` → **Settings** | Confirm |
+| Currency subunit | YER, treated as having no practical subunit | `Restaurant.currency` → **Settings** | Confirm |
 | Timezone | `Asia/Aden` (UTC+3, no DST) | `Restaurant.timezone` → **Settings** | Confirm — the whole schedule is evaluated in it |
-| Payment methods | Pay-at-pickup and bank transfer enabled; electronic disabled | `prisma/seed.ts` → **Settings → Payment methods** | **Yes** |
-| Bank details | Placeholder bank name, account number and holder | `Restaurant.bank*` → **Settings** | **Yes** — check character by character |
-| Contact details | Placeholder phone, WhatsApp, email, address, map link, coordinates | `Restaurant` → **Settings** | **Yes** |
-| Social links | Placeholder Instagram/Facebook URLs | `Restaurant` → **Settings** | **Yes** |
-| Product images | 18 generated SVG illustrations | `public/menu/*.svg` | **Yes** — real photography |
-| Promotions | Two demo promotions | `prisma/seed.ts` → **Promotions** | **Yes** — delete or replace |
-| Staff | Four demo accounts, one per role, `@pizzahouse.local` | `prisma/seed.ts` → **Staff** | **Yes** — delete them all |
+| Map pin | A search link, not a dropped pin with coordinates | `Restaurant.mapUrl`, `latitude`, `longitude` → **Settings** | **Yes** — ask for the exact pin |
+| Email | None set; the restaurant may not use one | `Restaurant.email` → **Settings** | Confirm |
+| Facebook | None set | `Restaurant.facebookUrl` → **Settings** | Confirm whether one exists |
+| Public holidays | None entered | **Hours → Overrides** | **Yes** — Eid in particular |
+| Coupons | Three launch coupons seeded as examples | `prisma/seed.ts` → **Coupons** | **Yes** — the client sets the real discounts |
+| Staff | Four demo accounts, one per role, `@pizzahouse.local` | `prisma/seed.ts` → **Staff** | **Yes** — delete them all and issue real ones |
 | Existing systems | None assumed; this platform is treated as additive | — | Confirm whether an existing POS must run alongside |
 
-## Two that were assumptions and are no longer
+## Three that were assumptions and are no longer
 
 Recorded because earlier versions of this document listed them, and someone
 reading an old copy should know they were resolved rather than forgotten:
@@ -42,14 +57,19 @@ reading an old copy should know they were resolved rather than forgotten:
   independent of the server's clock (`docs/DECISIONS.md`).
 - **~~Database~~.** Earlier builds used SQLite for zero-setup development,
   with a note to switch. It is PostgreSQL with versioned migrations now.
+- **~~One trading period a day~~.** The schema allowed a single open window
+  per weekday, which cannot express a kitchen that shuts between lunch and
+  dinner. It held a lie about this restaurant for as long as it existed: the
+  seeded 16:00–00:00 would have sold a 14:00 pickup during a closed kitchen.
+  A day now holds as many windows as it needs, and Friday holds one.
 
 ## What this does not block
 
-Nothing above blocks development, review or demonstration. The data model,
-the scheduling engine, the ordering flow and the staff tools all work with
-any real values substituted in — which is the point of keeping every
-restaurant-specific value in data.
+Nothing above blocks development, review or demonstration, and the menu,
+prices, hours and contact details are now the real ones — so a demo to the
+client shows the client's own restaurant.
 
-What it blocks is **launch**. A customer ordering from a placeholder menu at
-placeholder prices, to be collected during placeholder hours, is worse than
-no site at all. See `docs/HANDOVER.md`.
+What it still blocks is **launch**: the demo staff accounts must be deleted
+and real ones issued, the slot capacity must be a number the kitchen agrees
+it can cook, and the coupons must be discounts the owner actually wants to
+give. See `docs/HANDOVER.md`.

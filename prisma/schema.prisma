@@ -117,6 +117,10 @@ model Restaurant {
 }
 
 // 0 = Sunday ... 6 = Saturday
+// One trading window. A day has as many rows as it has services: Pizza House
+// bakes pastries 08:00-12:00 and pizza 16:00-23:30 and is shut in between, so
+// a single row per day could not describe it — and the four closed midday
+// hours were bookable because of that.
 model BusinessHour {
   id           String     @id @default(cuid())
   restaurantId String
@@ -126,7 +130,10 @@ model BusinessHour {
   closesAt     String // "HH:mm"; may cross midnight (closesAt <= opensAt)
   closed       Boolean    @default(false)
 
-  @@unique([restaurantId, dayOfWeek])
+  // Opening time completes the key, so a day holds many windows while the same
+  // window still cannot be entered twice.
+  @@unique([restaurantId, dayOfWeek, opensAt])
+  @@index([restaurantId, dayOfWeek])
 }
 
 model ScheduleOverride {

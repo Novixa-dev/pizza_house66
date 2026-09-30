@@ -489,25 +489,50 @@ export async function deletePromotionAction(form: FormData): Promise<ActionState
 
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "time_format");
 
+/** How many services the hours form offers per day. */
+export const SESSIONS_PER_DAY = 2;
+
+/** What an unfilled service falls back to: the restaurant's real two shifts. */
+export const DEFAULT_SESSIONS = [
+  { opensAt: "08:00", closesAt: "12:00" },
+  { opensAt: "16:00", closesAt: "23:30" },
+] as const;
+
 export async function saveBusinessHoursAction(form: FormData): Promise<ActionState> {
   return run(async () => {
     const actor = await auditor("hours.manage");
     const restaurant = await prisma.restaurant.findFirstOrThrow({ select: { id: true } });
 
-    const updates = [];
-    for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
-      const closed = checkbox(form, `closed-${dayOfWeek}`);
-      const opensAt = hhmm.parse(text(form, `opensAt-${dayOfWeek}`) || "16:00");
-      const closesAt = hhmm.parse(text(form, `closesAt-${dayOfWeek}`) || "00:00");
-      updates.push(
-        prisma.businessHour.upsert({
-          where: { restaurantId_dayOfWeek: { restaurantId: restaurant.id, dayOfWeek } },
-          create: { restaurantId: restaurant.id, dayOfWeek, opensAt, closesAt, closed },
-          update: { opensAt, closesAt, closed },
-        })
-      );
+    // Two services a day, each switchable on its own: the kitchen bakes
+    // pastries in the morning and pizza in the evening, and is shut between
+    // them. `SESSIONS_PER_DAY` is the form's shape, not a limit of the model —
+    // the table takes as many windows a day as it is given.
+    const rows: { dayOfWeek: number; opensAt: string; closesAt: string; closed: boolean }[] = [];
+
+    for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek += 1) {
+      for (let session = 0; session < SESSIONS_PER_DAY; session += 1) {
+        const key = `${dayOfWeek}-${session}`;
+        if (checkbox(form, `closed-${key}`)) continue;
+
+        const opensAt = hhmm.parse(text(form, `opensAt-${key}`) || DEFAULT_SESSIONS[session].opensAt);
+        const closesAt = hhmm.parse(text(form, `closesAt-${key}`) || DEFAULT_SESSIONS[session].closesAt);
+
+        // Two services that start at the same minute are one service entered
+        // twice; the unique key would refuse the second anyway.
+        if (rows.some((row) => row.dayOfWeek === dayOfWeek && row.opensAt === opensAt)) continue;
+        rows.push({ dayOfWeek, opensAt, closesAt, closed: false });
+      }
     }
-    await prisma.$transaction(updates);
+
+    // Replaced wholesale rather than diffed: the set is at most fourteen rows,
+    // and a day that lost a service has to lose its row, which an upsert per
+    // row cannot express.
+    await prisma.$transaction([
+      prisma.businessHour.deleteMany({ where: { restaurantId: restaurant.id } }),
+      ...(rows.length > 0
+        ? [prisma.businessHour.createMany({ data: rows.map((r) => ({ ...r, restaurantId: restaurant.id })) })]
+        : []),
+    ]);
 
     await audit(actor, "hours.update", "Restaurant", restaurant.id);
     revalidateAdmin("/admin/hours", "/");

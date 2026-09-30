@@ -108,255 +108,185 @@ const extrasGroup: OptionGroupSeed = {
   ],
 };
 
-const drinkSize: OptionGroupSeed = {
-  slug: "drink-size",
-  nameAr: "الحجم",
-  nameEn: "Size",
-  required: true,
-  values: [
-    { slug: "regular", nameAr: "عادي", nameEn: "Regular", priceDeltaMinor: 0 },
-    { slug: "large", nameAr: "كبير", nameEn: "Large", priceDeltaMinor: 200 },
-  ],
-};
-
+// The real Pizza House 66 menu, taken from the restaurant's own published
+// listing: sixteen items across five sections, at the prices actually charged
+// in Yemeni rial. What shipped before was an illustrative placeholder, so the
+// owner would have had to retype every line before opening.
 const CATALOG: CategorySeed[] = [
   {
     slug: "pizza",
-    nameAr: "البيتزا",
-    nameEn: "Pizza",
-    descriptionAr: "عجينة تُحضّر يوميًا وتُخبز عند الطلب",
-    descriptionEn: "Dough made fresh daily, baked to order",
+    nameAr: "البيتزا الإيطالية",
+    nameEn: "Italian pizza",
+    descriptionAr: "عجينة طازجة يوميًا مخبوزة على الحجر",
+    descriptionEn: "Dough made fresh daily, stone-baked",
     icon: "pizza",
     products: [
       {
-        slug: "margherita",
-        nameAr: "مارغريتا",
-        nameEn: "Margherita",
-        descriptionAr: "صلصة طماطم، موزاريلا، ريحان طازج، زيت زيتون",
-        descriptionEn: "Tomato sauce, mozzarella, fresh basil, olive oil",
-        imageUrl: "/menu/pizza-margherita.svg",
-        basePriceMinor: 2200,
-        featured: true,
-        badge: "bestseller",
-        prepMinutes: 18,
-        optionGroups: [pizzaSizes(700, 1400), crustGroup, extrasGroup],
-      },
-      {
-        slug: "pepperoni",
-        nameAr: "بيبروني",
-        nameEn: "Pepperoni",
-        descriptionAr: "شرائح بيبروني، موزاريلا، صلصة طماطم",
-        descriptionEn: "Pepperoni slices, mozzarella, tomato sauce",
-        imageUrl: "/menu/pizza-pepperoni.svg",
-        basePriceMinor: 2500,
+        slug: "supreme",
+        nameAr: "بيتزا هاوس سوبريم الخاصة",
+        nameEn: "Pizza House Supreme",
+        descriptionAr:
+          "مزيج متكامل من قطع اللحم والدجاج والببروني، مع الفلفل الرومي، البصل، الزيتون، والمشروم الطازج بجبنة الموزاريلا الغنية.",
+        descriptionEn:
+          "Beef, chicken and pepperoni with bell pepper, onion, olives and fresh mushrooms under rich mozzarella.",
+        imageUrl: "/menu/pizza-supreme.jpg",
+        basePriceMinor: 5500,
         featured: true,
         badge: "bestseller",
         prepMinutes: 20,
-        optionGroups: [pizzaSizes(800, 1500), crustGroup, extrasGroup],
+        optionGroups: [pizzaSizes(1200, 2400), crustGroup, extrasGroup],
       },
       {
         slug: "chicken-ranch",
-        nameAr: "دجاج رانش",
+        nameAr: "بيتزا دجاج رانش",
         nameEn: "Chicken Ranch",
-        descriptionAr: "قطع دجاج مشوي، صلصة رانش، بصل، موزاريلا",
-        descriptionEn: "Grilled chicken, ranch sauce, onion, mozzarella",
-        imageUrl: "/menu/pizza-chicken-ranch.svg",
-        basePriceMinor: 2800,
+        descriptionAr:
+          "قطع صدور دجاج مشوية بتتبيلتنا الخاصة، صوص الرانش الغني، فطر طازج، وجبنة موزاريلا تعلوها رشة أوريجانو عطرة.",
+        descriptionEn:
+          "Grilled chicken breast in our own marinade, rich ranch sauce, fresh mushrooms and mozzarella with oregano.",
+        imageUrl: "/menu/pizza-chicken-ranch.jpg",
+        basePriceMinor: 5000,
         featured: true,
-        prepMinutes: 22,
-        optionGroups: [pizzaSizes(800, 1600), crustGroup, extrasGroup],
+        badge: "bestseller",
+        prepMinutes: 20,
+        optionGroups: [pizzaSizes(1100, 2200), crustGroup, extrasGroup],
+      },
+      {
+        slug: "bbq-chicken",
+        nameAr: "بيتزا دجاج باربكيو",
+        nameEn: "BBQ Chicken",
+        descriptionAr:
+          "دجاج متبل بصلصة الباربكيو المدخنة اللذيذة مع شرائح البصل الأحمر وجبنة الموزاريلا وصوص البيتزا الذهبي.",
+        descriptionEn:
+          "Chicken in smoky barbecue sauce with red onion, mozzarella and our golden pizza sauce.",
+        imageUrl: "/menu/pizza-bbq-chicken.jpg",
+        basePriceMinor: 4800,
+        prepMinutes: 20,
+        optionGroups: [pizzaSizes(1000, 2100), crustGroup, extrasGroup],
+      },
+      {
+        slug: "pepperoni",
+        nameAr: "بيتزا ببروني كلاسيك",
+        nameEn: "Classic Pepperoni",
+        descriptionAr:
+          "شرائح ببروني بقري فاخر مع جبنة موزاريلا ذائبة وصلصة الطماطم الإيطالية الخاصة ببيتزا هاوس على عجينة طازجة.",
+        descriptionEn:
+          "Prime beef pepperoni, melting mozzarella and our own Italian tomato sauce on fresh dough.",
+        imageUrl: "/menu/pizza-pepperoni.jpg",
+        basePriceMinor: 4500,
+        featured: true,
+        prepMinutes: 18,
+        optionGroups: [pizzaSizes(1000, 2000), crustGroup, extrasGroup],
       },
       {
         slug: "veggie",
-        nameAr: "خضار",
-        nameEn: "Veggie",
-        descriptionAr: "فلفل ملوّن، زيتون، فطر، بصل، ذرة",
-        descriptionEn: "Bell peppers, olives, mushrooms, onion, corn",
-        imageUrl: "/menu/pizza-veggie.svg",
-        basePriceMinor: 2400,
-        prepMinutes: 20,
-        optionGroups: [pizzaSizes(700, 1400), crustGroup, extrasGroup],
+        nameAr: "بيتزا خضار مشكل (فيجي)",
+        nameEn: "Mixed Vegetable",
+        descriptionAr:
+          "تشكيلة غنية من الخضار الطازجة: فلفل حلو ملون، بصل مقرمش، طماطم، زيتون، مشروم، مع صلصة الطماطم وجبنة الموزاريلا.",
+        descriptionEn:
+          "Sweet peppers, crisp onion, tomato, olives and mushrooms with tomato sauce and mozzarella.",
+        imageUrl: "/menu/pizza-veggie.jpg",
+        basePriceMinor: 4000,
+        prepMinutes: 18,
+        optionGroups: [pizzaSizes(900, 1800), crustGroup, extrasGroup],
       },
       {
-        slug: "four-cheese",
-        nameAr: "أربعة أجبان",
-        nameEn: "Four Cheese",
-        descriptionAr: "موزاريلا، شيدر، بارميزان، جبن كريمي",
-        descriptionEn: "Mozzarella, cheddar, parmesan, cream cheese",
-        imageUrl: "/menu/pizza-four-cheese.svg",
-        basePriceMinor: 2900,
-        prepMinutes: 20,
+        slug: "margherita",
+        nameAr: "بيتزا مارجريتا الأصلية",
+        nameEn: "Classic Margherita",
+        descriptionAr:
+          "البساطة الإيطالية الفاخرة: صلصة طماطم متبلة بالأعشاب الطازجة، طبقة وفيرة من جبنة الموزاريلا الفاخرة، وزيت الزيتون البكر.",
+        descriptionEn:
+          "Italian simplicity: herbed tomato sauce, a generous layer of mozzarella and extra-virgin olive oil.",
+        imageUrl: "/menu/pizza-margherita.jpg",
+        basePriceMinor: 3500,
+        prepMinutes: 16,
         optionGroups: [pizzaSizes(800, 1600), crustGroup, extrasGroup],
       },
+    ],
+  },
+  {
+    slug: "pastries",
+    nameAr: "الفطائر والمعجنات",
+    nameEn: "Pastries",
+    descriptionAr: "تُخبز في الفترة الصباحية على الحجر",
+    descriptionEn: "Stone-baked during the morning service",
+    icon: "pizza",
+    products: [
       {
-        slug: "spicy-beef",
-        nameAr: "لحم حار",
-        nameEn: "Spicy Beef",
-        descriptionAr: "لحم مفروم متبّل، فلفل حار، بصل، موزاريلا",
-        descriptionEn: "Seasoned minced beef, chilli, onion, mozzarella",
-        imageUrl: "/menu/pizza-spicy-beef.svg",
-        basePriceMinor: 3000,
-        badge: "spicy",
-        prepMinutes: 22,
-        optionGroups: [pizzaSizes(900, 1700), crustGroup, extrasGroup],
+        slug: "meat-fatayer",
+        nameAr: "فطيرة لحم مفروم بالبهارات",
+        nameEn: "Spiced Minced Meat Fatayer",
+        descriptionAr:
+          "عجينة رقيقة ومحشوة باللحم المفروم الطازج المتبل بالبصل والبهارات الشرقية المميزة.",
+        descriptionEn: "Thin dough filled with fresh minced meat, onion and Levantine spices.",
+        imageUrl: "/menu/fatayer-meat.jpg",
+        basePriceMinor: 2200,
+        prepMinutes: 12,
       },
       {
-        slug: "house-special",
-        nameAr: "بيتزا البيت",
-        nameEn: "House Special",
-        descriptionAr: "بيبروني، لحم، فطر، فلفل، زيتون — كل ما نحبه في بيتزا واحدة",
-        descriptionEn: "Pepperoni, beef, mushrooms, peppers, olives — everything we love on one pizza",
-        imageUrl: "/menu/pizza-special.svg",
-        basePriceMinor: 3400,
+        slug: "kraft-honey-fatayer",
+        nameAr: "فطيرة جبن كرافت بالعسل",
+        nameEn: "Kraft Cheese & Honey Fatayer",
+        descriptionAr: "فطيرة ساخنة ومحشوة بجبنة كرافت الأصلية الغنية ومغطاة بأجود أنواع العسل الصافي.",
+        descriptionEn: "Hot pastry filled with rich Kraft cheese and finished with pure honey.",
+        imageUrl: "/menu/fatayer-kraft-honey.jpg",
+        basePriceMinor: 2000,
         featured: true,
-        badge: "featured",
-        prepMinutes: 25,
-        optionGroups: [pizzaSizes(900, 1800), crustGroup, extrasGroup],
+        prepMinutes: 12,
+      },
+      {
+        slug: "zaatar-labneh",
+        nameAr: "فطيرة لبنة وزعتر بلدي",
+        nameEn: "Labneh & Wild Za'atar",
+        descriptionAr: "لبنة كريمية تركية مع خلطة الزعتر البري وزيت الزيتون على عجينة مخبوزة على الحجر.",
+        descriptionEn: "Creamy labneh with wild za'atar and olive oil on stone-baked dough.",
+        imageUrl: "/menu/fatayer-zaatar.jpg",
+        basePriceMinor: 1800,
+        prepMinutes: 12,
       },
     ],
   },
   {
     slug: "sides",
-    nameAr: "المقبلات",
+    nameAr: "المقبلات والإضافات",
     nameEn: "Sides",
     descriptionAr: "ما يكمل الوجبة",
-    descriptionEn: "What rounds out the meal",
+    descriptionEn: "What completes the meal",
     icon: "sides",
     products: [
       {
-        slug: "calzone",
-        nameAr: "كالزوني",
-        nameEn: "Calzone",
-        descriptionAr: "عجينة مطوية محشوة بالجبن واللحم",
-        descriptionEn: "Folded dough stuffed with cheese and beef",
-        imageUrl: "/menu/calzone.svg",
-        basePriceMinor: 2000,
-        prepMinutes: 18,
-        optionGroups: [
-          {
-            slug: "calzone-filling",
-            nameAr: "الحشوة",
-            nameEn: "Filling",
-            required: true,
-            values: [
-              { slug: "cheese", nameAr: "جبن", nameEn: "Cheese", priceDeltaMinor: 0 },
-              { slug: "beef", nameAr: "لحم", nameEn: "Beef", priceDeltaMinor: 400 },
-              { slug: "chicken", nameAr: "دجاج", nameEn: "Chicken", priceDeltaMinor: 350 },
-            ],
-          },
-        ],
+        slug: "mozzarella-sticks",
+        nameAr: "أصابع جبنة الموزاريلا المقلية",
+        nameEn: "Fried Mozzarella Sticks",
+        descriptionAr: "أصابع الموزاريلا الذهبية المقرمشة (5 قطع) تقدم مع صوص المارينارا اللذيذ للتغميس.",
+        descriptionEn: "Five golden, crisp mozzarella sticks served with marinara for dipping.",
+        imageUrl: "/menu/mozzarella-sticks.jpg",
+        basePriceMinor: 2200,
+        prepMinutes: 10,
       },
       {
-        slug: "chicken-burger",
-        nameAr: "برجر دجاج",
-        nameEn: "Chicken Burger",
-        descriptionAr: "صدر دجاج مقرمش، خس، طماطم، صلصة المطعم",
-        descriptionEn: "Crispy chicken breast, lettuce, tomato, house sauce",
-        imageUrl: "/menu/burger.svg",
+        slug: "garlic-bread",
+        nameAr: "خبز بالثوم وجبنة الموزاريلا",
+        nameEn: "Garlic Bread with Mozzarella",
+        descriptionAr:
+          "قطع خبز فرنسي مقرمش مدهونة بزبدة الثوم والأعشاب ومغطاة بجبنة الموزاريلا الساخنة الذائبة.",
+        descriptionEn: "Crisp French bread with garlic-herb butter under hot melted mozzarella.",
+        imageUrl: "/menu/garlic-bread.jpg",
         basePriceMinor: 1800,
-        prepMinutes: 12,
-        optionGroups: [
-          {
-            slug: "burger-extras",
-            nameAr: "إضافات",
-            nameEn: "Extras",
-            multiSelect: true,
-            maxSelect: 3,
-            values: [
-              { slug: "cheese-slice", nameAr: "شريحة جبن", nameEn: "Cheese slice", priceDeltaMinor: 200 },
-              { slug: "spicy-sauce", nameAr: "صلصة حارة", nameEn: "Spicy sauce", priceDeltaMinor: 100 },
-              { slug: "double-patty", nameAr: "قطعة إضافية", nameEn: "Double patty", priceDeltaMinor: 700 },
-            ],
-          },
-        ],
+        prepMinutes: 10,
       },
       {
-        slug: "fries",
-        nameAr: "بطاطس مقلية",
-        nameEn: "French Fries",
-        descriptionAr: "بطاطس مقرمشة مع توابل المطعم",
-        descriptionEn: "Crispy fries with house seasoning",
-        imageUrl: "/menu/fries.svg",
-        basePriceMinor: 800,
-        badge: "value",
-        prepMinutes: 8,
-        optionGroups: [
-          {
-            slug: "fries-size",
-            nameAr: "الحجم",
-            nameEn: "Size",
-            required: true,
-            values: [
-              { slug: "regular", nameAr: "عادي", nameEn: "Regular", priceDeltaMinor: 0 },
-              { slug: "large", nameAr: "كبير", nameEn: "Large", priceDeltaMinor: 300 },
-            ],
-          },
-        ],
-      },
-      {
-        slug: "garden-salad",
-        nameAr: "سلطة خضراء",
-        nameEn: "Garden Salad",
-        descriptionAr: "خس، طماطم، خيار، صلصة ليمون وزيت زيتون",
-        descriptionEn: "Lettuce, tomato, cucumber, lemon and olive oil dressing",
-        imageUrl: "/menu/salad.svg",
-        basePriceMinor: 900,
-        prepMinutes: 5,
-      },
-    ],
-  },
-  {
-    slug: "drinks",
-    nameAr: "المشروبات",
-    nameEn: "Drinks",
-    descriptionAr: "بارد ومنعش",
-    descriptionEn: "Cold and refreshing",
-    icon: "drinks",
-    products: [
-      {
-        slug: "cola",
-        nameAr: "كولا",
-        nameEn: "Cola",
-        descriptionAr: "مشروب غازي بارد",
-        descriptionEn: "Chilled soft drink",
-        imageUrl: "/menu/cola.svg",
-        basePriceMinor: 400,
-        prepMinutes: 2,
-        optionGroups: [drinkSize],
-      },
-      {
-        slug: "orange-juice",
-        nameAr: "عصير برتقال",
-        nameEn: "Orange Juice",
-        descriptionAr: "برتقال طازج يُعصر عند الطلب",
-        descriptionEn: "Fresh oranges, squeezed to order",
-        imageUrl: "/menu/orange-juice.svg",
-        basePriceMinor: 700,
-        featured: true,
-        prepMinutes: 5,
-        optionGroups: [drinkSize],
-      },
-      {
-        slug: "mint-lemonade",
-        nameAr: "ليمون بالنعناع",
-        nameEn: "Mint Lemonade",
-        descriptionAr: "ليمون طازج مع نعناع ومثلج",
-        descriptionEn: "Fresh lemon with mint, served iced",
-        imageUrl: "/menu/mojito.svg",
-        basePriceMinor: 800,
-        badge: "new",
-        prepMinutes: 5,
-        optionGroups: [drinkSize],
-      },
-      {
-        slug: "water",
-        nameAr: "مياه",
-        nameEn: "Bottled Water",
-        descriptionAr: "قارورة مياه ٦٠٠ مل",
-        descriptionEn: "600ml bottle",
-        imageUrl: "/menu/water.svg",
-        basePriceMinor: 200,
-        prepMinutes: 1,
+        slug: "potato-wedges",
+        nameAr: "بطاطس ودجز متبلة بالأعشاب",
+        nameEn: "Herb Potato Wedges",
+        descriptionAr:
+          "أصابع بطاطس ودجز مقرمشة ومتبلة بخلطة البابريكا والأعشاب الإيطالية مع صوص الكاتشب أو المايونيز.",
+        descriptionEn: "Crisp wedges in paprika and Italian herbs, with ketchup or mayonnaise.",
+        imageUrl: "/menu/potato-wedges.jpg",
+        basePriceMinor: 1500,
+        prepMinutes: 10,
       },
     ],
   },
@@ -364,101 +294,151 @@ const CATALOG: CategorySeed[] = [
     slug: "desserts",
     nameAr: "الحلويات",
     nameEn: "Desserts",
-    descriptionAr: "نهاية حلوة للوجبة",
-    descriptionEn: "A sweet finish",
-    icon: "desserts",
+    descriptionAr: "تُخبز طازجة عند الطلب",
+    descriptionEn: "Baked fresh to order",
+    icon: "dessert",
     products: [
       {
-        slug: "chocolate-cake",
-        nameAr: "كيكة شوكولاتة",
-        nameEn: "Chocolate Cake",
-        descriptionAr: "قطعة كيكة شوكولاتة غنية",
-        descriptionEn: "A rich slice of chocolate cake",
-        imageUrl: "/menu/chocolate-cake.svg",
-        basePriceMinor: 1000,
-        prepMinutes: 3,
-      },
-      {
-        slug: "cheesecake",
-        nameAr: "تشيز كيك",
-        nameEn: "Cheesecake",
-        descriptionAr: "تشيز كيك بصلصة التوت",
-        descriptionEn: "Cheesecake with berry sauce",
-        imageUrl: "/menu/cheesecake.svg",
-        basePriceMinor: 1200,
+        slug: "nutella-banana",
+        nameAr: "فطيرة النوتيلا والموز الدافئة",
+        nameEn: "Warm Nutella & Banana",
+        descriptionAr:
+          "عجينة بيتزا طازجة ومحشوة بشوكولاتة النوتيلا الغنية مع شرائح الموز والمكسرات المحمصة.",
+        descriptionEn: "Fresh pizza dough filled with Nutella, banana slices and toasted nuts.",
+        imageUrl: "/menu/nutella-banana.jpg",
+        basePriceMinor: 2500,
         featured: true,
-        prepMinutes: 3,
+        prepMinutes: 12,
+      },
+    ],
+  },
+  {
+    slug: "drinks",
+    nameAr: "المشروبات المنعشة",
+    nameEn: "Cold drinks",
+    descriptionAr: "مثلجة ومنعشة",
+    descriptionEn: "Chilled and refreshing",
+    icon: "drink",
+    products: [
+      {
+        slug: "pepsi",
+        nameAr: "بيبسي بارد",
+        nameEn: "Pepsi",
+        descriptionAr: "مشروب بيبسي غازي منعش ومثلج (علبة 330 مل).",
+        descriptionEn: "Chilled Pepsi, 330 ml can.",
+        imageUrl: "/menu/pepsi.jpg",
+        basePriceMinor: 700,
+        prepMinutes: 1,
       },
       {
-        slug: "tiramisu",
-        nameAr: "تيراميسو",
-        nameEn: "Tiramisu",
-        descriptionAr: "طبقات قهوة وكريمة",
-        descriptionEn: "Layers of coffee and cream",
-        imageUrl: "/menu/tiramisu.svg",
-        basePriceMinor: 1300,
-        // Demonstrates the sold-out state on a real screen rather than in docs.
-        availability: "SOLD_OUT",
-        prepMinutes: 3,
+        slug: "seven-up",
+        nameAr: "سفن آب بارد",
+        nameEn: "7UP",
+        descriptionAr: "مشروب سفن آب ليمون منعش ومثلج (علبة 330 مل).",
+        descriptionEn: "Chilled lemon 7UP, 330 ml can.",
+        imageUrl: "/menu/seven-up.jpg",
+        basePriceMinor: 700,
+        prepMinutes: 1,
+      },
+      {
+        slug: "water",
+        nameAr: "مياه شرب نقية",
+        nameEn: "Bottled Water",
+        descriptionAr: "مياه شرب معبأة نقية ومنعشة (500 مل).",
+        descriptionEn: "Pure bottled drinking water, 500 ml.",
+        imageUrl: "/menu/water.jpg",
+        basePriceMinor: 400,
+        prepMinutes: 1,
       },
     ],
   },
 ];
 
 async function seedRestaurant() {
+  // Facts about the business, taken from the client's own published listing
+  // (docs/RESTAURANT_DISCOVERY.md). These are re-applied on every seed: if
+  // the phone number in the database disagrees with the one on the shopfront,
+  // the shopfront is right.
+  const identity = {
+    name: "Pizza House 66",
+    nameAr: "بيتزا هاوس 66",
+    taglineAr: "اطلب مسبقًا، واستلم في وقتك",
+    taglineEn: "Order ahead, collect on your schedule",
+    aboutAr:
+      "بيتزا هاوس 66 مطعم في المكلا متخصص في البيتزا المخبوزة عند الطلب. نحضّر العجينة يوميًا ونستخدم مكونات طازجة، والآن يمكنك الطلب مسبقًا واختيار وقت الاستلام الذي يناسبك بدل الانتظار عند الطاولة.",
+    aboutEn:
+      "Pizza House 66 is a restaurant in Al Mukalla specializing in pizza baked to order. We make our dough daily and use fresh ingredients — and now you can order ahead and choose the pickup time that suits you instead of waiting at the counter.",
+    currency: "YER",
+    timezone: "Asia/Aden",
+    phone: "05375561",
+    whatsapp: "+967772207788",
+    addressAr: "حضرموت، المكلا، فوه، حي المساكن — بالقرب من مستوصف النور وجامعة الأحقاف ومدرسة السلال",
+    addressEn:
+      "Hadhramaut, Al Mukalla, Fuwah, Al Masakin district — near Al Nour clinic, Al Ahgaff University and Al Sallal school",
+    city: "Al Mukalla",
+    mapUrl: "https://maps.google.com/?q=Pizza+House+66+Al+Mukalla",
+    instagramUrl: "https://www.instagram.com/pizza_house66/",
+    // The client collects transfers through Yemen's local wallets rather than
+    // a bank IBAN, so the "bank" fields carry the wallet names and the number
+    // customers already send to.
+    bankNameAr: "محافظ كريمي / العمقي / البسيري",
+    bankNameEn: "Kuraimi / Al-Omqi / Al-Basiri wallets",
+    bankAccount: "772207788",
+    bankHolderAr: "بيتزا هاوس 66",
+    bankHolderEn: "Pizza House 66",
+    seoTitleAr: "بيتزا هاوس 66 المكلا | اطلب بيتزا أونلاين واستلم في وقتك",
+    seoTitleEn: "Pizza House 66 Al Mukalla | Order pizza online for pickup",
+    seoDescriptionAr:
+      "اطلب بيتزا طازجة من بيتزا هاوس 66 في المكلا. تصفح القائمة، خصص طلبك، واختر وقت الاستلام المناسب لك.",
+    seoDescriptionEn:
+      "Order fresh pizza from Pizza House 66 in Al Mukalla. Browse the menu, customize your order, and choose a pickup time that works for you.",
+  };
+
+  // Operating knobs the manager tunes from the dashboard. Seeded once, then
+  // left alone — re-seeding must not quietly undo an evening's decision to
+  // pause ordering or widen a slot.
+  const operatingDefaults = {
+    defaultPrepMinutes: 20,
+    slotIntervalMinutes: 15,
+    slotCapacity: 10,
+    maxScheduleDaysAhead: 3,
+    minOrderMinor: 0,
+    onlineOrderingPaused: false,
+    pauseMessageAr: "الطلب عبر الإنترنت متوقف مؤقتًا بسبب ضغط الطلبات. نعتذر، ونرحب بكم في المطعم.",
+    pauseMessageEn:
+      "Online ordering is paused for a short while because the kitchen is at capacity. Sorry — you're still very welcome in the restaurant.",
+  };
+
   const restaurant = await prisma.restaurant.upsert({
     where: { slug: RESTAURANT_SLUG },
-    create: {
-      slug: RESTAURANT_SLUG,
-      name: "Pizza House",
-      nameAr: "بيتزا هاوس",
-      taglineAr: "اطلب مسبقًا، واستلم في وقتك",
-      taglineEn: "Order ahead, collect on your schedule",
-      aboutAr:
-        "بيتزا هاوس مطعم في المكلا متخصص في البيتزا المخبوزة عند الطلب. نحضّر العجينة يوميًا ونستخدم مكونات طازجة، والآن يمكنك الطلب مسبقًا واختيار وقت الاستلام الذي يناسبك بدل الانتظار عند الطاولة.",
-      aboutEn:
-        "Pizza House is a restaurant in Al Mukalla specializing in pizza baked to order. We make our dough daily and use fresh ingredients — and now you can order ahead and choose the pickup time that suits you instead of waiting at the counter.",
-      currency: "YER",
-      timezone: "Asia/Aden",
-      phone: "+967 5 300000",
-      whatsapp: "+967 700000000",
-      email: "hello@pizzahouse.example",
-      addressAr: "شارع الرئيسي، المكلا، حضرموت",
-      addressEn: "Main Street, Al Mukalla, Hadhramaut",
-      city: "Al Mukalla",
-      mapUrl: "https://maps.google.com/?q=Al+Mukalla",
-      defaultPrepMinutes: 20,
-      slotIntervalMinutes: 15,
-      slotCapacity: 10,
-      maxScheduleDaysAhead: 3,
-      minOrderMinor: 0,
-      onlineOrderingPaused: false,
-      pauseMessageAr: "الطلب عبر الإنترنت متوقف مؤقتًا بسبب ضغط الطلبات. نعتذر، ونرحب بكم في المطعم.",
-      pauseMessageEn:
-        "Online ordering is paused for a short while because the kitchen is at capacity. Sorry — you're still very welcome in the restaurant.",
-      bankNameAr: "بنك المثال",
-      bankNameEn: "Example Bank",
-      bankAccount: "0000-000000-000",
-      bankHolderAr: "مطعم بيتزا هاوس",
-      bankHolderEn: "Pizza House Restaurant",
-      seoTitleAr: "بيتزا هاوس المكلا | اطلب بيتزا أونلاين واستلم في وقتك",
-      seoTitleEn: "Pizza House Al Mukalla | Order pizza online for pickup",
-      seoDescriptionAr:
-        "اطلب بيتزا طازجة من بيتزا هاوس في المكلا. تصفح القائمة، خصص طلبك، واختر وقت الاستلام المناسب لك.",
-      seoDescriptionEn:
-        "Order fresh pizza from Pizza House in Al Mukalla. Browse the menu, customize your order, and choose a pickup time that works for you.",
-    },
-    update: {},
+    create: { slug: RESTAURANT_SLUG, ...identity, ...operatingDefaults },
+    update: identity,
   });
 
-  // 16:00–00:00 every day (docs/ASSUMPTIONS.md — real hours must be confirmed).
-  for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
-    await prisma.businessHour.upsert({
-      where: { restaurantId_dayOfWeek: { restaurantId: restaurant.id, dayOfWeek } },
-      create: { restaurantId: restaurant.id, dayOfWeek, opensAt: "16:00", closesAt: "00:00", closed: false },
-      update: {},
-    });
-  }
+  // The kitchen runs two services a day, not one long one: a morning shift and
+  // an evening shift, with the kitchen shut in between. Friday has no morning
+  // service at all — that is an absent row, not a row marked closed, so the
+  // scheduler never offers a slot inside a gap. See src/lib/scheduling.ts.
+  const MORNING = { opensAt: "08:00", closesAt: "12:00" };
+  const EVENING = { opensAt: "16:00", closesAt: "23:30" };
+  const FRIDAY = 5;
+
+  const hours = Array.from({ length: 7 }, (_, dayOfWeek) =>
+    dayOfWeek === FRIDAY ? [EVENING] : [MORNING, EVENING]
+  ).flatMap((sessions, dayOfWeek) =>
+    sessions.map((session) => ({
+      restaurantId: restaurant.id,
+      dayOfWeek,
+      opensAt: session.opensAt,
+      closesAt: session.closesAt,
+      closed: false,
+    }))
+  );
+
+  await prisma.$transaction([
+    prisma.businessHour.deleteMany({ where: { restaurantId: restaurant.id } }),
+    prisma.businessHour.createMany({ data: hours }),
+  ]);
 
   const methods = [
     {
@@ -498,6 +478,23 @@ async function seedRestaurant() {
 }
 
 async function seedCatalog() {
+  // Anything left over from an earlier catalogue is hidden rather than
+  // deleted: past orders point at those rows, so removing them would take
+  // the order history with them. Hidden keeps the receipt readable and the
+  // menu honest.
+  const liveCategorySlugs = CATALOG.map((category) => category.slug);
+  const liveProductSlugs = CATALOG.flatMap((category) =>
+    category.products.map((product) => product.slug)
+  );
+  await prisma.product.updateMany({
+    where: { slug: { notIn: liveProductSlugs }, availability: { not: "HIDDEN" } },
+    data: { availability: "HIDDEN", featured: false },
+  });
+  await prisma.category.updateMany({
+    where: { slug: { notIn: liveCategorySlugs }, active: true },
+    data: { active: false },
+  });
+
   for (const [categoryIndex, category] of CATALOG.entries()) {
     const categoryRow = await prisma.category.upsert({
       where: { slug: category.slug },
@@ -719,22 +716,25 @@ async function main() {
     console.log("[seed] Empty database — seeding initial data.");
   }
 
-  console.log("[seed] Seeding Pizza House demo data…");
+  console.log("[seed] Seeding Pizza House 66 data…");
   await seedRestaurant();
   await seedCatalog();
   await seedPromotions();
   await seedStaff();
 
+  // Counted as the menu counts them — hidden leftovers from an earlier
+  // catalogue are still rows, but they are not the menu.
   const counts = await Promise.all([
-    prisma.category.count(),
-    prisma.product.count(),
+    prisma.category.count({ where: { active: true } }),
+    prisma.product.count({ where: { availability: { not: "HIDDEN" } } }),
     prisma.promotion.count(),
     prisma.user.count(),
   ] as PrismaPromise<number>[]);
   console.log(
     `[seed] Done — ${counts[0]} categories, ${counts[1]} products, ${counts[2]} promotions, ${counts[3]} staff accounts.`
   );
-  console.log("[seed] Reminder: this menu is illustrative. See docs/ASSUMPTIONS.md before launch.");
+  console.log("[seed] The menu, hours and contact details are the real ones.");
+  console.log("[seed] Still to confirm before launch: see docs/ASSUMPTIONS.md.");
 }
 
 main()

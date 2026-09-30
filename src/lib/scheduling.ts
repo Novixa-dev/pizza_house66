@@ -45,27 +45,48 @@ export interface SchedulingConfig {
 }
 
 /**
- * The open window for the calendar day that `dayAnchor` falls on. A closing
- * time at or before the opening time means the restaurant trades past
- * midnight, so the window is returned ending on the following day — the
- * 16:00–00:00 shift the restaurant actually works.
+ * Every open window for the calendar day that `dayAnchor` falls on, earliest
+ * first.
+ *
+ * A day has more than one window whenever the kitchen shuts between services,
+ * which is the normal shape of this business rather than an edge case: Pizza
+ * House bakes pastries 08:00–12:00 and pizza 16:00–23:30, and is shut in
+ * between. Modelling one window per day made those four closed midday hours
+ * bookable, and the customer arriving at 13:00 to a locked door was the
+ * system's fault.
+ *
+ * A closing time at or before its opening time means the window runs past
+ * midnight, so it is returned ending on the following day.
  */
+export function resolveOpenWindows(
+  dayAnchor: Date,
+  hours: BusinessHourRule[],
+  overrides: ScheduleOverrideRule[],
+  timeZone: string
+): OpenWindow[] {
+  // An override replaces the whole day: one special window, or shut. That is
+  // what a holiday or a one-off late opening actually is.
+  const override = overrides.find((o) => isSameZonedDay(o.date, dayAnchor, timeZone));
+  if (override) {
+    if (override.closed || !override.opensAt || !override.closesAt) return [];
+    return [buildWindow(dayAnchor, override.opensAt, override.closesAt, timeZone)];
+  }
+
+  const weekday = getZonedParts(dayAnchor, timeZone).weekday;
+  return hours
+    .filter((rule) => rule.dayOfWeek === weekday && !rule.closed)
+    .map((rule) => buildWindow(dayAnchor, rule.opensAt, rule.closesAt, timeZone))
+    .sort((a, b) => a.opensAt.getTime() - b.opensAt.getTime());
+}
+
+/** The first window of that day, or null. Kept for callers that want one. */
 export function resolveOpenWindow(
   dayAnchor: Date,
   hours: BusinessHourRule[],
   overrides: ScheduleOverrideRule[],
   timeZone: string
 ): OpenWindow | null {
-  const override = overrides.find((o) => isSameZonedDay(o.date, dayAnchor, timeZone));
-  if (override) {
-    if (override.closed || !override.opensAt || !override.closesAt) return null;
-    return buildWindow(dayAnchor, override.opensAt, override.closesAt, timeZone);
-  }
-
-  const weekday = getZonedParts(dayAnchor, timeZone).weekday;
-  const rule = hours.find((h) => h.dayOfWeek === weekday);
-  if (!rule || rule.closed) return null;
-  return buildWindow(dayAnchor, rule.opensAt, rule.closesAt, timeZone);
+  return resolveOpenWindows(dayAnchor, hours, overrides, timeZone)[0] ?? null;
 }
 
 function buildWindow(
@@ -83,8 +104,58 @@ function buildWindow(
 }
 
 /**
+ * The window that matters to someone asking "are you open?" right now: the one
+ * we are inside, or else the next one to open.
+ *
+ * With a single window a day, "today's window" answered both questions. With a
+ * midday break it stops: at 13:00, between the 08:00–12:00 and 16:00–23:30
+ * services, the first window of the day is already over, and a badge built
+ * from it tells the customer the restaurant opens at 08:00 — a time four hours
+ * in the past.
+ *
+ * Searches from yesterday (an overnight window can still be running) up to
+ * `withinDays` ahead, so a Friday morning question gets Friday's 16:00 answer
+ * rather than nothing.
+ */
+export function currentOrNextWindow(
+  at: Date,
+  hours: BusinessHourRule[],
+  overrides: ScheduleOverrideRule[],
+  timeZone: string,
+  withinDays = 8
+): OpenWindow | null {
+  let upcoming: OpenWindow | null = null;
+
+  for (let dayOffset = -1; dayOffset <= withinDays; dayOffset += 1) {
+    for (const window of resolveOpenWindows(
+      addDays(at, dayOffset),
+      hours,
+      overrides,
+      timeZone
+    )) {
+      if (at >= window.opensAt && at < window.closesAt) return window;
+      if (window.opensAt > at && (!upcoming || window.opensAt < upcoming.opensAt)) {
+        upcoming = window;
+      }
+    }
+    // Windows are visited in chronological order, so the first future one
+    // found after the current day is already the nearest.
+    if (upcoming && dayOffset >= 0) return upcoming;
+  }
+
+  return upcoming;
+}
+
+/**
  * Whether `at` is inside an open window. Checks the previous calendar day too,
  * because an overnight window that opened yesterday can still be open now.
+ *
+ * The window is half-open: open at `opensAt`, shut at `closesAt`. A restaurant
+ * that closes at 12:00 is not open at 12:00 — it is closing. With one window a
+ * day ending at midnight that distinction cost nothing, so the comparison used
+ * to include both ends. With a midday break it costs the truth: at exactly
+ * 12:00 the badge read "open now" about a kitchen whose shutters were coming
+ * down, and the last offered pickup was a handover nobody would be there for.
  */
 export function isWithinBusinessHours(
   at: Date,
@@ -93,8 +164,9 @@ export function isWithinBusinessHours(
   timeZone: string
 ): boolean {
   for (const anchor of [at, addDays(at, -1)]) {
-    const window = resolveOpenWindow(anchor, hours, overrides, timeZone);
-    if (window && at >= window.opensAt && at <= window.closesAt) return true;
+    for (const window of resolveOpenWindows(anchor, hours, overrides, timeZone)) {
+      if (at >= window.opensAt && at < window.closesAt) return true;
+    }
   }
   return false;
 }
@@ -145,20 +217,23 @@ export function generatePickupSlots(
   // Start a day early so an overnight window opened yesterday is included.
   for (let dayOffset = -1; dayOffset <= maxScheduleDaysAhead; dayOffset++) {
     const anchor = addDays(from, dayOffset);
-    const window = resolveOpenWindow(anchor, hours, overrides, timeZone);
-    if (!window) continue;
 
-    let cursor = snapUpToSlot(
-      window.opensAt.getTime() > from.getTime() ? window.opensAt : from,
-      slotIntervalMinutes,
-      timeZone
-    );
-    while (cursor <= window.closesAt && cursor <= horizon) {
-      if (cursor >= from && cursor >= window.opensAt) {
-        slots.push(new Date(cursor));
-        if (slots.length >= limit) return dedupeSorted(slots);
+    for (const window of resolveOpenWindows(anchor, hours, overrides, timeZone)) {
+      let cursor = snapUpToSlot(
+        window.opensAt.getTime() > from.getTime() ? window.opensAt : from,
+        slotIntervalMinutes,
+        timeZone
+      );
+      // `<` and not `<=`, to stay in step with isWithinBusinessHours: the
+      // validator re-checks every submitted time against it, so a slot offered
+      // at exactly closing time would be a slot the server then refuses.
+      while (cursor < window.closesAt && cursor <= horizon) {
+        if (cursor >= from && cursor >= window.opensAt) {
+          slots.push(new Date(cursor));
+          if (slots.length >= limit) return dedupeSorted(slots);
+        }
+        cursor = addMinutes(cursor, slotIntervalMinutes);
       }
-      cursor = addMinutes(cursor, slotIntervalMinutes);
     }
   }
 

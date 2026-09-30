@@ -220,3 +220,103 @@ describe("generatePickupSlots", () => {
     expect(nextValidPickupSlot(aden("16:00"), closed)).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Two services a day
+//
+// The real Pizza House 66 opens 08:00–12:00 and again 16:00–23:30, and is shut
+// in between. Friday has no morning service. Until the schema allowed a day to
+// hold more than one window, the seeded hours said 16:00–00:00 every day, which
+// sold pickups at 14:00 into a locked kitchen and refused every morning order.
+// These cases exist so that gap can never quietly close again.
+
+const realHours: BusinessHourRule[] = Array.from({ length: 7 }, (_, dayOfWeek) =>
+  dayOfWeek === 5
+    ? [{ dayOfWeek, opensAt: "16:00", closesAt: "23:30", closed: false }]
+    : [
+        { dayOfWeek, opensAt: "08:00", closesAt: "12:00", closed: false },
+        { dayOfWeek, opensAt: "16:00", closesAt: "23:30", closed: false },
+      ]
+).flat();
+
+const realConfig: SchedulingConfig = { ...config, hours: realHours };
+
+describe("two services a day", () => {
+  it("is open in the morning service", () => {
+    expect(isWithinBusinessHours(aden("08:00"), realHours, [], TZ)).toBe(true);
+    expect(isWithinBusinessHours(aden("11:59"), realHours, [], TZ)).toBe(true);
+  });
+
+  it("is shut in the gap between the two services", () => {
+    expect(isWithinBusinessHours(aden("12:00"), realHours, [], TZ)).toBe(false);
+    expect(isWithinBusinessHours(aden("14:00"), realHours, [], TZ)).toBe(false);
+    expect(isWithinBusinessHours(aden("15:59"), realHours, [], TZ)).toBe(false);
+  });
+
+  it("is open in the evening service", () => {
+    expect(isWithinBusinessHours(aden("16:00"), realHours, [], TZ)).toBe(true);
+    expect(isWithinBusinessHours(aden("23:29"), realHours, [], TZ)).toBe(true);
+    expect(isWithinBusinessHours(aden("23:30"), realHours, [], TZ)).toBe(false);
+  });
+
+  it("has no morning service on Friday", () => {
+    // 2026-01-09 is a Friday.
+    expect(isWithinBusinessHours(aden("09:00", 9), realHours, [], TZ)).toBe(false);
+    expect(isWithinBusinessHours(aden("17:00", 9), realHours, [], TZ)).toBe(true);
+  });
+
+  it("offers no pickup slot inside the gap", () => {
+    const slots = generatePickupSlots(aden("08:00"), realConfig);
+    expect(slots.length).toBeGreaterThan(0);
+    for (const slot of slots) {
+      expect(isWithinBusinessHours(slot, realHours, [], TZ)).toBe(true);
+    }
+    const midday = slots.filter((slot) => {
+      const hour = Number(
+        new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", hour12: false }).format(slot)
+      );
+      return hour >= 12 && hour < 16;
+    });
+    expect(midday).toEqual([]);
+  });
+
+  it("jumps an order placed during the gap to the evening service", () => {
+    const slot = nextValidPickupSlot(aden("13:00"), realConfig);
+    expect(slot).not.toBeNull();
+    expect(isWithinBusinessHours(slot!, realHours, [], TZ)).toBe(true);
+    expect(slot!.toISOString()).toBe(aden("16:00").toISOString());
+  });
+
+  it("offers a morning slot to someone ordering at breakfast", () => {
+    // nextValidPickupSlot does not add preparation time — the caller has
+    // already done that — so 08:05 snaps up to the next boundary.
+    const slot = nextValidPickupSlot(aden("08:05"), realConfig);
+    expect(slot).not.toBeNull();
+    expect(slot!.toISOString()).toBe(aden("08:15").toISOString());
+  });
+
+  it("reaches Saturday morning for an order placed after Friday's close", () => {
+    // 2026-01-09 is a Friday; the kitchen shuts at 23:30 and reopens 08:00.
+    const slot = nextValidPickupSlot(new Date("2026-01-09T23:30:00+03:00"), realConfig);
+    expect(slot).not.toBeNull();
+    expect(slot!.toISOString()).toBe(new Date("2026-01-10T08:00:00+03:00").toISOString());
+  });
+
+  it("never offers a slot the validator would then reject", () => {
+    // The picker and the server must agree to the minute, including at the
+    // edges of every window (docs/PRD.md §12.3).
+    for (const slot of generatePickupSlots(aden("08:00"), realConfig)) {
+      const result = validatePickupTime({
+        now: aden("08:00"),
+        requested: slot,
+        prepMinutes: 0,
+        config: realConfig,
+        onlineOrderingPaused: false,
+      });
+      expect({ slot: slot.toISOString(), valid: result.valid }).toEqual({
+        slot: slot.toISOString(),
+        valid: true,
+      });
+    }
+  });
+});
