@@ -49,6 +49,14 @@
   --info: #1f5f8b;
   --info-soft: #e6f0f7;
 
+  /* Focus indicator. Two colours, not one: a single ring colour is invisible
+     wherever it happens to match the surface — a brand ring on a brand
+     button measured 1.00:1. The ring and its halo always contrast with each
+     other, so whatever they are drawn over, one of the two is visible
+     (WCAG 2.4.11 / 2.4.13). */
+  --focus-ring: #1f1811;
+  --focus-halo: #ffffff;
+
   --radius-sm: 0.5rem;
   --radius: 0.875rem;
   --radius-lg: 1.25rem;
@@ -89,6 +97,9 @@
 
     --info: #7bb6de;
     --info-soft: #14283a;
+
+    --focus-ring: #f6efe4;
+    --focus-halo: #14100b;
 
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
     --shadow: 0 4px 14px rgb(0 0 0 / 0.45);
@@ -171,11 +182,22 @@ body {
 }
 
 /* A visible, high-contrast focus ring everywhere. Keyboard users are not an
-   afterthought (docs/PRD.md §50). */
+   afterthought (docs/PRD.md §50).
+
+   The halo is what makes this reliable. `outline-offset` leaves a gap showing
+   whatever is behind the element, so a ring in any single colour disappears
+   against a surface of that colour — the skip link, brand ring on a brand
+   background, measured exactly 1.00:1 and was invisible to anyone using a
+   keyboard, on the first stop of every page. The box-shadow fills that gap
+   in the opposite tone, so ring and halo always contrast with each other and
+   at least one of them contrasts with whatever is underneath.
+
+   No `border-radius` here: setting it would square off a pill and round a
+   square while focused. An outline already follows the element's own radius. */
 :focus-visible {
-  outline: 2px solid var(--brand);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
-  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 4px var(--focus-halo);
 }
 
 /* Western-Arabic digits, tabular, isolated left-to-right.

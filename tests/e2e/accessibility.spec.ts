@@ -232,6 +232,35 @@ test.describe("accessibility — the commitments in docs/DESIGN-SYSTEM.md", () =
     }
   });
 
+  test("the focus indicator stays visible on a brand-coloured surface", async ({ page }) => {
+    // The skip link is the first Tab stop on every page and sits on
+    // `bg-brand`. A single-colour ring in the brand colour measured exactly
+    // 1.00:1 there — invisible, on the one control that exists purely for
+    // keyboard users. The halo is what fixes it, so its absence is the
+    // regression worth catching.
+    await page.goto("/");
+    await page.keyboard.press("Tab");
+
+    const focus = await page.evaluate(() => {
+      const el = document.activeElement;
+      if (!el) return null;
+      const cs = getComputedStyle(el);
+      return {
+        isSkipLink: el.getAttribute("href") === "#main",
+        outlineWidth: parseFloat(cs.outlineWidth),
+        outlineStyle: cs.outlineStyle,
+        boxShadow: cs.boxShadow,
+      };
+    });
+
+    expect(focus, "Tab should focus something").not.toBeNull();
+    expect(focus!.isSkipLink, "the first Tab stop should be the skip link").toBe(true);
+    expect(focus!.outlineStyle).not.toBe("none");
+    expect(focus!.outlineWidth).toBeGreaterThan(0);
+    // The halo: a spread-only shadow drawn around the element.
+    expect(focus!.boxShadow, "the focus halo must be present").not.toBe("none");
+  });
+
   test("keyboard focus is visible, not suppressed", async ({ page }) => {
     await page.goto("/");
     await page.keyboard.press("Tab");
