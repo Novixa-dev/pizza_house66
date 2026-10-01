@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { PrismaClient } from "@prisma/client";
 import { E2E_NAME_PREFIX, E2E_PHONE_PREFIX } from "./global-setup";
 
 /**
@@ -61,24 +62,44 @@ test.describe("customer ordering", () => {
     ).toBeVisible();
 
     await page.getByRole("searchbox").fill("pepperoni");
-    await expect(
-      page.getByRole("link", { name: /pepperoni|بيبروني/i }).first(),
-    ).toBeVisible();
+    // Asserted by slug rather than by the rendered name. The Arabic for
+    // "pepperoni" can be spelled ببروني or بيبروني, and the catalogue uses
+    // the restaurant's own spelling — matching the name made this test an
+    // assertion about transliteration rather than about search.
+    await expect(page.locator('a[href="/product/pepperoni"]')).toHaveCount(1);
     // Something from another category should now be filtered out.
-    await expect(
-      page.getByRole("link", { name: /^cheesecake$|^تشيز كيك$/i }),
-    ).toHaveCount(0);
+    await expect(page.locator('a[href="/product/pepsi"]')).toHaveCount(0);
   });
 
   test("a sold-out product is visible but not orderable", async ({ page }) => {
-    await page.goto("/menu");
-    // Tiramisu is seeded SOLD_OUT specifically so this state is exercised.
-    const soldOut = page
-      .locator('[aria-label*="Sold out"], [aria-label*="غير متوفر"]')
-      .first();
-    await expect(soldOut).toBeVisible();
-    // It is a div, not a link — there is nothing to click through to.
-    await expect(soldOut).not.toHaveAttribute("href", /.*/);
+    // The condition is created here rather than seeded. It used to rely on
+    // one product being permanently SOLD_OUT in the seed, which silently
+    // stopped covering anything the moment that product left the catalogue —
+    // the test kept passing against a menu where nothing was sold out,
+    // because it only looked for the first match of a selector.
+    const prisma = new PrismaClient();
+    try {
+      await prisma.product.update({
+        where: { slug: "veggie" },
+        data: { availability: "SOLD_OUT" },
+      });
+
+      await page.goto("/menu");
+      const card = page.locator('[data-testid="product-card-veggie"]');
+      await expect(card).toBeVisible();
+      await expect(card.getByText(/sold out|غير متوفر/i).first()).toBeVisible();
+      // Still listed, so a customer can see the item exists — but the card is
+      // a div, not a link: there is nothing to click through to
+      // (docs/PRD.md §17).
+      await expect(card).not.toHaveAttribute("href", /.*/);
+      await expect(page.locator('a[href="/product/veggie"]')).toHaveCount(0);
+    } finally {
+      await prisma.product.update({
+        where: { slug: "veggie" },
+        data: { availability: "AVAILABLE" },
+      });
+      await prisma.$disconnect();
+    }
   });
 
   test("product customization updates the running total", async ({ page }) => {
