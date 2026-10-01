@@ -210,6 +210,29 @@ that never run. Deploy by hand — either `workflow_dispatch` with
 run lint && npm test && npm run test:integration` before you do, since that is
 exactly what CI would have run.
 
+## What production currently tracks
+
+Railway's `app` service is wired to the repository with:
+
+```
+source.branch       claude/lucid-bohr-kmmyyp
+source.checkSuites  false
+```
+
+Two things follow, and both are worth knowing before the next change:
+
+1. **Production follows a feature branch, not `main`.** Every push to
+   `claude/lucid-bohr-kmmyyp` deploys straight to the live site. That is why
+   the site updated during development without anyone merging anything.
+2. **`checkSuites: false` means Railway does not wait for CI.** It would not
+   wait even if CI worked. A broken commit reaches customers as fast as a good
+   one.
+
+Once `main` is the default branch, point Railway at `main` (service →
+Settings → Source) and turn its automatic deploys off, leaving the workflow
+below as the only path to production. Until then, treat a push to that branch
+as a deploy, because it is one.
+
 ## Automatic deployment
 
 `.github/workflows/deploy.yml` ships `main` to Railway **after** CI has passed

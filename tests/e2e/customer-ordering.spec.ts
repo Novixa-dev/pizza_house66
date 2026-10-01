@@ -85,13 +85,24 @@ test.describe("customer ordering", () => {
       });
 
       await page.goto("/menu");
-      const card = page.locator('[data-testid="product-card-veggie"]');
-      await expect(card).toBeVisible();
-      await expect(card.getByText(/sold out|غير متوفر/i).first()).toBeVisible();
-      // Still listed, so a customer can see the item exists — but the card is
-      // a div, not a link: there is nothing to click through to
-      // (docs/PRD.md §17).
-      await expect(card).not.toHaveAttribute("href", /.*/);
+
+      // The menu renders a product in more than one place — a featured rail
+      // and its category section — so every card for it is checked rather
+      // than the first. A sold-out item that still reads as orderable in one
+      // of them is the whole failure this guards against.
+      const cards = page.locator('[data-testid="product-card-veggie"]');
+      const count = await cards.count();
+      expect(count, "veggie should be on the menu").toBeGreaterThan(0);
+
+      for (let i = 0; i < count; i += 1) {
+        const card = cards.nth(i);
+        await expect(card).toBeVisible();
+        await expect(card.getByText(/sold out|غير متوفر/i).first()).toBeVisible();
+        // Still listed, so a customer can see the item exists — but the card
+        // is a div, not a link: there is nothing to click through to
+        // (docs/PRD.md §17).
+        await expect(card).not.toHaveAttribute("href", /.*/);
+      }
       await expect(page.locator('a[href="/product/veggie"]')).toHaveCount(0);
     } finally {
       await prisma.product.update({
