@@ -85,7 +85,7 @@ export default async function TermsPage() {
           <h2>الحساب والبيانات</h2>
           <p>
             لا يتطلب الطلب إنشاء حساب. ما نحتفظ به وكيف، موضح في{" "}
-            <a href="/privacy" className="font-semibold text-brand underline underline-offset-4">
+            <a href="/privacy" className="inline-flex min-h-6 items-center font-semibold text-brand underline underline-offset-4">
               سياسة الخصوصية
             </a>
             .
@@ -150,7 +150,7 @@ export default async function TermsPage() {
           <h2>Accounts and data</h2>
           <p>
             Ordering needs no account. What we keep, and how, is set out in the{" "}
-            <a href="/privacy" className="font-semibold text-brand underline underline-offset-4">
+            <a href="/privacy" className="inline-flex min-h-6 items-center font-semibold text-brand underline underline-offset-4">
               privacy policy
             </a>
             .

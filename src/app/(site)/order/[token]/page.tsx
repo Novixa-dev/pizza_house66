@@ -240,7 +240,7 @@ export default async function OrderTrackingPage({ params }: PageProps<"/order/[t
           whatsappMessage={pick(locale, "طلبي من بيتزا هاوس 66:", "My Pizza House 66 order:")}
         />
         <p className="mt-4 text-sm">
-          <Link href="/orders" className="font-semibold text-brand underline underline-offset-4">
+          <Link href="/orders" className="inline-flex min-h-6 items-center font-semibold text-brand underline underline-offset-4">
             {t.track.myOrders}
           </Link>
         </p>

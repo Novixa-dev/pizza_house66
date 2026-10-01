@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { createOrder } from "@/server/orders";
 import {
+  buildReorder,
   findOrderByReferenceAndPhone,
   phoneTail,
   summarizeOrders,
@@ -153,5 +154,77 @@ describe("summarizeOrders", () => {
     // Returns nothing because none exist; the point is that it does not hand
     // an unbounded IN list to the database.
     expect(await summarizeOrders(many)).toEqual([]);
+  });
+});
+
+describe("buildReorder", () => {
+  it("rebuilds a past order as a basket", async () => {
+    const order = await createOrder(orderInput());
+    const result = await buildReorder(order.trackingToken);
+
+    expect(result).not.toBeNull();
+    expect(result!.lines).toHaveLength(1);
+    expect(result!.unavailableEn).toEqual([]);
+    expect(result!.lines[0]!.productId).toBe(pizzaId);
+    expect(result!.lines[0]!.quantity).toBe(1);
+    expect(result!.lines[0]!.options.map((o) => o.optionValueId).sort()).toEqual(
+      [sizeValueId, crustValueId].sort()
+    );
+  });
+
+  it("prices from the product as it is now, not from the receipt", async () => {
+    const before = await prisma.product.findUniqueOrThrow({ where: { id: pizzaId } });
+    const order = await createOrder(orderInput());
+    expect(order.items[0]!.basePriceMinor).toBe(before.basePriceMinor);
+
+    await prisma.product.update({
+      where: { id: pizzaId },
+      data: { basePriceMinor: before.basePriceMinor + 750 },
+    });
+    try {
+      const result = await buildReorder(order.trackingToken);
+      // Rebuilding from the order's snapshot would sell today's pizza at
+      // March's price, every time a regular tapped "order again".
+      expect(result!.lines[0]!.basePriceMinor).toBe(before.basePriceMinor + 750);
+    } finally {
+      await prisma.product.update({
+        where: { id: pizzaId },
+        data: { basePriceMinor: before.basePriceMinor },
+      });
+    }
+  });
+
+  it("names a withdrawn item instead of quietly dropping it", async () => {
+    const order = await createOrder(orderInput());
+    await prisma.product.update({ where: { id: pizzaId }, data: { availability: "HIDDEN" } });
+    try {
+      const result = await buildReorder(order.trackingToken);
+      expect(result!.lines).toEqual([]);
+      // A basket silently missing the thing someone came back for is worse
+      // than a basket that says what it could not bring.
+      expect(result!.unavailableEn).toHaveLength(1);
+      expect(result!.unavailableAr).toHaveLength(1);
+    } finally {
+      await prisma.product.update({ where: { id: pizzaId }, data: { availability: "AVAILABLE" } });
+    }
+  });
+
+  it("still offers something that is only sold out", async () => {
+    const order = await createOrder(orderInput());
+    await prisma.product.update({ where: { id: pizzaId }, data: { availability: "SOLD_OUT" } });
+    try {
+      // SOLD_OUT changes by the hour and checkout re-checks it; HIDDEN means
+      // withdrawn. Refusing both would make "order again" useless every
+      // evening the kitchen runs out of one thing.
+      const result = await buildReorder(order.trackingToken);
+      expect(result!.lines).toHaveLength(1);
+    } finally {
+      await prisma.product.update({ where: { id: pizzaId }, data: { availability: "AVAILABLE" } });
+    }
+  });
+
+  it("returns nothing for a token it does not know", async () => {
+    expect(await buildReorder("not-a-real-token-but-long-enough")).toBeNull();
+    expect(await buildReorder("short")).toBeNull();
   });
 });

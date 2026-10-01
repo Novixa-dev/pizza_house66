@@ -146,6 +146,43 @@ events" — an error that points nowhere near the actual cause.
 
 ---
 
+## Never assert on seed data you can change
+
+Eight end-to-end tests broke in one afternoon when the catalogue was replaced
+with the restaurant's real menu. Not one of them was testing anything that
+broke — the product worked throughout. They were coupled to the seed:
+
+- Five reached the product page by clicking a link matching
+  `/margherita|مارغريتا/`. The real catalogue spells it **مارجريتا**, with a
+  ج. The Arabic-language project timed out on every one of them.
+- One searched for "pepperoni" and asserted on **بيبروني** against a menu
+  that says **ببروني**.
+- One asserted that a cheesecake link was filtered out. Cheesecake had left
+  the menu entirely, so the assertion passed without testing the filter.
+- One relied on tiramisu being seeded `SOLD_OUT` to exercise that state.
+  Tiramisu left too, nothing else was sold out, and the test kept passing
+  because it only looked for the first match of a selector — it asserted
+  against a menu where its subject did not exist.
+
+The last two are the dangerous ones: they did not fail. They quietly stopped
+testing anything, which is worse than a red build, because a red build gets
+fixed.
+
+Three rules came out of it:
+
+1. **Navigate and assert by slug**, never by a rendered name. A slug is the
+   stable identifier and it is the same in both languages. Display names are
+   content, and content is the thing most likely to change.
+2. **A test that needs a state should create it**, not hope the seed still
+   provides it. The sold-out test now marks a product `SOLD_OUT`, asserts,
+   and restores it in a `finally`.
+3. **Assert that something is there, not only that something is absent.** An
+   absence assertion against data that no longer exists is a test that cannot
+   fail.
+
+Every product card carries `data-testid="product-card-<slug>"` so a test can
+name the product it means rather than taking the first match.
+
 ## What is not covered
 
 Stated rather than implied:

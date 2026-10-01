@@ -187,6 +187,25 @@ export function CheckoutForm({
     });
   }
 
+  function promoMessage(reasonCode: string | undefined): string {
+    switch (reasonCode) {
+      case "BELOW_MINIMUM":
+        return t.checkout.promoBelowMinimum;
+      case "NEEDS_PHONE":
+        return t.checkout.promoNeedsPhone;
+      case "NOT_YOURS":
+        return t.checkout.promoNotYours;
+      case "ALREADY_USED":
+        return t.checkout.promoAlreadyUsed;
+      case "CUSTOMER_LIMIT":
+        return t.checkout.promoCustomerLimit;
+      case "NO_ELIGIBLE_ITEMS":
+        return t.checkout.promoNoEligibleItems;
+      default:
+        return t.checkout.promoInvalid;
+    }
+  }
+
   async function applyPromo() {
     const code = promoCode.trim();
     if (!code) return;
@@ -196,14 +215,20 @@ export function CheckoutForm({
       const response = await fetch("/api/promotions/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, items: cartPayload() }),
+        // The phone goes with the code. A coupon issued to one customer can
+        // only be checked against the number it was issued to, and a
+        // per-customer cap can only be counted for a known customer — without
+        // it, the two most useful kinds of coupon both come back "invalid".
+        body: JSON.stringify({
+          code,
+          items: cartPayload(),
+          ...(phone.trim().length >= 7 ? { phone: phone.trim() } : {}),
+        }),
       });
       const data = await response.json();
       if (!response.ok || !data.valid) {
         setPromo(null);
-        setPromoError(
-          data.reasonCode === "BELOW_MINIMUM" ? t.checkout.promoBelowMinimum : t.checkout.promoInvalid
-        );
+        setPromoError(promoMessage(data.reasonCode));
         return;
       }
       setPromo({

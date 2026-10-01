@@ -158,11 +158,27 @@ export function KitchenBoard({
 
       {upcoming.length > 0 ? (
         <section className="border-t border-line bg-surface-muted p-4">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-extrabold uppercase tracking-wide text-ink-muted">
+          <h2
+            id="kitchen-upcoming-heading"
+            className="mb-3 flex items-center gap-2 text-sm font-extrabold uppercase tracking-wide text-ink-muted"
+          >
             <ClockIcon />
             {t.kitchen.upcoming}
           </h2>
-          <ul className="scroll-row flex gap-3">
+          {/* This lane scrolls sideways and its cards hold nothing focusable —
+              they are read, not operated. Without a tab stop of its own there
+              is no way to reach the orders past the fold with a keyboard, and
+              on a kitchen tablet with a bluetooth keyboard that is the whole
+              rest of the evening's schedule. `tabIndex` plus the heading as
+              its name is the standard remedy: focus it, then arrow-scroll.
+              Caught by tests/e2e/accessibility.spec.ts, which only sees this
+              lane once scheduled orders exist. */}
+          <ul
+            className="scroll-row flex gap-3"
+            tabIndex={0}
+            role="list"
+            aria-labelledby="kitchen-upcoming-heading"
+          >
             {upcoming.map((order) => {
               const startsInMinutes = Math.max(
                 0,

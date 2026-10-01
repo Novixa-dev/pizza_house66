@@ -3,7 +3,13 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { findOrderByReferenceAndPhone, summarizeOrders, type OrderSummary } from "./order-lookup";
+import {
+  buildReorder,
+  findOrderByReferenceAndPhone,
+  summarizeOrders,
+  type OrderSummary,
+  type ReorderResult,
+} from "./order-lookup";
 import { couponsForPhone, loyaltyStandingForPhone, type CustomerCoupon, type LoyaltyStanding } from "./coupons";
 import { normalizePhone } from "./order-schema";
 
@@ -98,4 +104,19 @@ export async function lookupCouponsAction(
     loyaltyStandingForPhone(phone),
   ]);
   return { phone: raw, coupons, standing, searched: true };
+}
+
+/**
+ * The basket for ordering a past order again.
+ *
+ * Takes the tracking token, which whoever is asking already holds — so this
+ * grants nothing the order's own page does not. Prices come back live, never
+ * from the receipt, and anything no longer orderable is named rather than
+ * quietly left out.
+ */
+export async function reorderAction(token: string): Promise<ReorderResult | null> {
+  const headerList = await headers();
+  const limit = checkRateLimit(`reorder:${clientAddress(headerList)}`, 30, 5 * 60_000);
+  if (limit.limited) return null;
+  return buildReorder(String(token));
 }

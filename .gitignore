@@ -53,3 +53,4 @@ next-env.d.ts
 
 # Screenshots captured for review — regenerate rather than version 5MB of PNGs.
 /screenshots/
+.pgkeep.sh

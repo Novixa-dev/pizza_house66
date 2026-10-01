@@ -8,11 +8,27 @@ const nextConfig: NextConfig = {
   typescript: { ignoreBuildErrors: false },
 
   images: {
-    // Menu art ships with the app, so there is no remote image host to allow.
-    // Adding one later means adding it here explicitly — a deliberate step,
-    // not an accidental open door.
-    remotePatterns: [],
+    // Two hosts, both named explicitly. A wildcard here would let any URL a
+    // staff member pastes into the admin become an image this server fetches
+    // and re-serves, which is a proxy with the restaurant's name on it.
+    //
+    // The menu photographs live on these rather than in the repository: the
+    // bytes do not belong in git, and Next's optimizer fetches, resizes and
+    // re-encodes them to AVIF or WebP at the size each device asks for, so
+    // the customer gets a smaller file than a committed JPEG would be.
+    //
+    // Both licences permit this use — Unsplash's own licence, and Creative
+    // Commons for Wikimedia. docs/ASSUMPTIONS.md records that these are
+    // stand-ins for the restaurant's own photographs, which the owner can
+    // upload over any of them from Admin → Products → Dish photo.
+    remotePatterns: [
+      { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },
+      { protocol: "https", hostname: "upload.wikimedia.org", pathname: "/**" },
+    ],
     formats: ["image/avif", "image/webp"],
+    // A menu photograph is replaced when the owner uploads their own, not on
+    // a schedule, so a long cache costs nothing and saves a round trip.
+    minimumCacheTTL: 60 * 60 * 24 * 7,
   },
 
   async redirects() {
