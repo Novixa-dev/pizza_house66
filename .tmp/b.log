@@ -1,0 +1,74 @@
+
+> pizza_house66@0.1.0 build
+> node scripts/build.mjs
+
+▲ Next.js 16.3.5 (Turbopack)
+- Environments: .env
+✓ Running next.config.ts took 3.7s
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 31.5s
+  Running TypeScript ...
+  Finished TypeScript in 6.2s ...
+  Collecting page data using 3 workers ...
+  Generating static pages using 3 workers (0/8) ...
+  Generating static pages using 3 workers (2/8) 
+  Generating static pages using 3 workers (4/8) 
+  Generating static pages using 3 workers (6/8) 
+✓ Generating static pages using 3 workers (8/8) in 712ms
+  Finalizing page optimization ...
+
+Route (app)                      Revalidate  Expire
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /about
+├ ƒ /admin
+├ ƒ /admin/audit
+├ ƒ /admin/categories
+├ ƒ /admin/customers
+├ ƒ /admin/hours
+├ ƒ /admin/login
+├ ƒ /admin/no-access
+├ ƒ /admin/orders
+├ ƒ /admin/orders/[id]
+├ ƒ /admin/payments
+├ ƒ /admin/products
+├ ƒ /admin/products/[id]
+├ ƒ /admin/products/new
+├ ƒ /admin/promotions
+├ ƒ /admin/reports
+├ ƒ /admin/settings
+├ ƒ /admin/staff
+├ ƒ /api/analytics
+├ ƒ /api/auth/login
+├ ƒ /api/auth/logout
+├ ƒ /api/cron/release-orders
+├ ƒ /api/locale
+├ ƒ /api/orders
+├ ƒ /api/orders/[token]/receipt
+├ ƒ /api/product-images/[slug]
+├ ƒ /api/promotions/preview
+├ ƒ /api/receipts/[paymentId]
+├ ƒ /cart
+├ ƒ /checkout
+├ ƒ /contact
+├ ƒ /faq
+├ ƒ /kitchen
+├ ○ /manifest.webmanifest
+├ ƒ /menu
+├ ƒ /offers
+├ ○ /opengraph-image
+├ ƒ /order/[token]
+├ ƒ /orders
+├ ƒ /privacy
+├ ƒ /product/[slug]
+├ ○ /robots.txt
+├ ○ /sitemap.xml                         1h      1y
+└ ƒ /terms
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
