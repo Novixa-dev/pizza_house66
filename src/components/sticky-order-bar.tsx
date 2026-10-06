@@ -39,24 +39,33 @@ export function StickyOrderBar({ locale, currency }: { locale: Locale; currency:
   if (!hydrated || itemCount === 0) return null;
 
   return (
-    <div
-      data-testid="sticky-order-bar"
-      // `pb-[env(...)]` keeps the bar clear of a phone's home indicator; the
-      // fallback is 0 everywhere that has no inset.
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-page/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:hidden"
-    >
-      <Link
-        href="/cart"
-        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-[var(--radius)] bg-brand px-4 py-2 font-semibold text-brand-ink shadow-[var(--shadow-sm)] transition-colors hover:bg-brand-hover"
+    <>
+      {/* Scrollable space the height of the bar, so a fixed bar never covers
+          the end of the page. It lives here rather than as padding on `main`
+          because the bar itself is conditional: reserving the space in the
+          layout left a gap below the footer for every visitor with an empty
+          basket, which is most of them. */}
+      <div aria-hidden className="h-20 sm:hidden" />
+
+      <div
+        data-testid="sticky-order-bar"
+        // `pb-[max(...)]` keeps the bar clear of a phone's home indicator,
+        // falling back to normal padding everywhere that has no inset.
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-page/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:hidden"
       >
-        <span className="flex items-center gap-2">
-          <CartIcon className="text-lg" />
-          <span className="numeric text-sm">
-            {itemCount} · {formatMoney(subtotalMinor, currency, locale)}
+        <Link
+          href="/cart"
+          className="flex min-h-12 w-full items-center justify-between gap-3 rounded-[var(--radius)] bg-brand px-4 py-2 font-semibold text-brand-ink shadow-[var(--shadow-sm)] transition-colors hover:bg-brand-hover"
+        >
+          <span className="flex items-center gap-2">
+            <CartIcon className="text-lg" />
+            <span className="numeric text-sm">
+              {itemCount} · {formatMoney(subtotalMinor, currency, locale)}
+            </span>
           </span>
-        </span>
-        <span className="text-sm">{t.cart.proceedToCheckout}</span>
-      </Link>
-    </div>
+          <span className="text-sm">{t.cart.proceedToCheckout}</span>
+        </Link>
+      </div>
+    </>
   );
 }

@@ -39,6 +39,40 @@ async function addPizzaToCart(page: Page) {
   await expect(page).toHaveURL(/\/cart/);
 }
 
+/** Places a pay-at-pickup ASAP order and lands on its tracking page. */
+async function placeAsapOrder(page: Page, suffix: string) {
+  await addPizzaToCart(page);
+  await page
+    .getByRole("link", { name: /checkout|إتمام الطلب|متابعة/i })
+    .first()
+    .click();
+
+  await page
+    .getByLabel(/name|الاسم/i)
+    .first()
+    .fill(`${E2E_NAME_PREFIX}Return`);
+  await page
+    .getByLabel(/phone|رقم الهاتف/i)
+    .first()
+    .fill(`${E2E_PHONE_PREFIX}${suffix}`);
+
+  await page.getByRole("button", { name: /place order|تأكيد الطلب/i }).click();
+  await expect(page).toHaveURL(/\/order\//, { timeout: 20_000 });
+
+  // The order is written into the device's list by an effect on the tracking
+  // page, so arriving at the URL is not the same as being remembered. Waiting
+  // on the stored list rather than on the page is what makes anything that
+  // navigates away next reliable.
+  await page.waitForFunction(() => {
+    try {
+      const raw = window.localStorage.getItem("ph66.orders.v1");
+      return raw !== null && (JSON.parse(raw) as unknown[]).length > 0;
+    } catch {
+      return false;
+    }
+  });
+}
+
 test.describe("customer ordering", () => {
   test("home page shows the restaurant and routes to the menu", async ({
     page,
@@ -86,23 +120,26 @@ test.describe("customer ordering", () => {
 
       await page.goto("/menu");
 
-      // The menu renders a product in more than one place — a featured rail
-      // and its category section — so every card for it is checked rather
-      // than the first. A sold-out item that still reads as orderable in one
-      // of them is the whole failure this guards against.
+      // Every card for the product is checked, not the first: the menu can
+      // render one in more than one place, and a sold-out item that still
+      // reads as orderable in one of them is the whole failure this guards
+      // against.
+      //
+      // Expressed as "no card is missing the marker" rather than as a loop
+      // over `count()`. Reading a count and then indexing into it asserts
+      // against a number captured at one instant, so a card arriving or
+      // leaving in between fails on an index that no longer exists — which
+      // is a flake in the test, not a fault in the menu. `toHaveCount`
+      // retries until the page settles.
       const cards = page.locator('[data-testid="product-card-veggie"]');
-      const count = await cards.count();
-      expect(count, "veggie should be on the menu").toBeGreaterThan(0);
+      await expect(cards, "veggie should be on the menu").not.toHaveCount(0);
+      await expect(
+        cards.filter({ hasNotText: /sold out|غير متوفر/i }),
+        "every card for a sold-out product must say so"
+      ).toHaveCount(0);
 
-      for (let i = 0; i < count; i += 1) {
-        const card = cards.nth(i);
-        await expect(card).toBeVisible();
-        await expect(card.getByText(/sold out|غير متوفر/i).first()).toBeVisible();
-        // Still listed, so a customer can see the item exists — but the card
-        // is a div, not a link: there is nothing to click through to
-        // (docs/PRD.md §17).
-        await expect(card).not.toHaveAttribute("href", /.*/);
-      }
+      // Still listed, so a customer can see the item exists — but there is
+      // nothing to click through to (docs/PRD.md §17).
       await expect(page.locator('a[href="/product/veggie"]')).toHaveCount(0);
     } finally {
       await prisma.product.update({
@@ -329,5 +366,28 @@ test.describe("the phone order bar", () => {
 
     await target.click();
     await expect(page).toHaveURL(/\/cart/);
+  });
+});
+
+// The home page's way back to a previous order. Its whole point is that it is
+// absent for a first-time visitor and present for a returning one, so both
+// halves are asserted — a banner that always shows would be worse than none.
+test.describe("the returning-customer prompt", () => {
+  test("appears on the home page only once this browser has an order", async ({
+    page,
+  }) => {
+    const prompt = page.getByTestId("returning-customer-prompt");
+
+    await page.goto("/");
+    await expect(prompt).toBeHidden(); // nothing remembered yet
+
+    await placeAsapOrder(page, "09");
+
+    await page.goto("/");
+    await expect(prompt).toBeVisible();
+    await expect(prompt).toContainText("1");
+
+    await prompt.click();
+    await expect(page).toHaveURL(/\/orders/);
   });
 });

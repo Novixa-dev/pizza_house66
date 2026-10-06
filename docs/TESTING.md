@@ -183,6 +183,47 @@ Three rules came out of it:
 Every product card carries `data-testid="product-card-<slug>"` so a test can
 name the product it means rather than taking the first match.
 
+---
+
+## A count read once is a count that can be wrong
+
+The sold-out test used to read how many cards the menu had for a product and
+then assert on each index in turn. That passes while the number is stable and
+fails on an index that no longer exists when it is not — and the failure
+reads exactly like a product bug while being a fault in the test.
+
+The same check, written so Playwright can retry it:
+
+```ts
+const cards = page.locator('[data-testid="product-card-veggie"]');
+await expect(cards).not.toHaveCount(0);
+await expect(cards.filter({ hasNotText: /sold out|غير متوفر/i })).toHaveCount(0);
+```
+
+"No card is missing the marker" is the same guarantee as "every card has the
+marker", with no index arithmetic and no single instant to be wrong about.
+Reach for `toHaveCount` on a filtered locator before reaching for `count()`
+and a loop.
+
+The related trap is asserting on state that an effect writes. `await
+expect(page).toHaveURL(/\/order\//)` resolves as soon as the URL matches,
+which is before the tracking page has hydrated and written the order into
+`localStorage` — so a test that navigates away next finds nothing remembered.
+Wait for the state itself, not for the page that produces it:
+
+```ts
+await page.waitForFunction(() => {
+  try {
+    const raw = window.localStorage.getItem("ph66.orders.v1");
+    return raw !== null && (JSON.parse(raw) as unknown[]).length > 0;
+  } catch {
+    return false;
+  }
+});
+```
+
+---
+
 ## What is not covered
 
 Stated rather than implied:

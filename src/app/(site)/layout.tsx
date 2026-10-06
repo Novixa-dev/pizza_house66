@@ -24,10 +24,7 @@ export default async function SiteLayout({ children }: LayoutProps<"/">) {
         isOpen={status.open}
         ordersPaused={restaurant.onlineOrderingPaused}
       />
-      {/* The bottom padding is the height the sticky bar occupies on a phone,
-          so the bar never covers the end of the page. It costs nothing from
-          `sm:` up, where the bar does not render. */}
-      <main id="main" className="flex-1 pb-20 sm:pb-0">
+      <main id="main" className="flex-1">
         {children}
       </main>
       <SiteFooter locale={locale} restaurant={restaurant} />

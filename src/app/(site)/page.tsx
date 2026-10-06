@@ -20,6 +20,7 @@ import {
   WhatsappIcon,
 } from "@/components/ui/icons";
 import { ProductCard } from "@/components/product-card";
+import { ReturningCustomerPrompt } from "@/components/returning-customer-prompt";
 
 export const dynamic = "force-dynamic";
 
@@ -130,6 +131,10 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Renders nothing unless this browser remembers an order, so a
+          first-time visitor never sees it. */}
+      <ReturningCustomerPrompt locale={locale} />
 
       {/* ---------------------------------------------------------------- */}
       {/* Categories                                                        */}
