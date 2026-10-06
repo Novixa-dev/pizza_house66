@@ -210,6 +210,42 @@ that never run. Deploy by hand — either `workflow_dispatch` with
 run lint && npm test && npm run test:integration` before you do, since that is
 exactly what CI would have run.
 
+## The live site is down: the Railway trial expired
+
+**2026-10-01, 08:37 UTC.** Railway sent the container SIGTERM, stopped it, and
+moved every deployment of the `app` service to REMOVED. The domain now serves
+Railway's "the train has not arrived at the station" page, which is what it
+shows when a service has no active deployment.
+
+A redeploy returns:
+
+> Your trial has expired. Please select a plan to continue using Railway.
+
+That is the whole cause. It is not a build failure, a bad commit, or a crash —
+the logs show a clean SIGTERM, not an error. **No change to this repository
+brings the site back.** The code that was running was healthy; it was switched
+off for billing.
+
+Three ways forward, in order of least work:
+
+1. **Pick a Railway plan.** Hobby is a few dollars a month and the service
+   redeploys from the branch it already tracks. Nothing else changes, and the
+   Postgres volume with the orders in it is still there.
+2. **Move the app to another host.** It is a standard Next.js server app with
+   a `Dockerfile`-free Nixpacks build, so Vercel, Fly.io or Render all take it.
+   The database has to move too — Neon and Supabase both have a free Postgres —
+   and `DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET`, `SEED_STAFF_PASSWORD` and
+   `NEXT_PUBLIC_APP_URL` move with it. Budget an afternoon, mostly for the
+   database.
+3. **Export the data first either way.** The Postgres volume is attached to a
+   project on an expired trial. Before anything else, take a dump: that is the
+   restaurant's order history and it is the only copy.
+
+Whichever is chosen, the menu photographs are the one piece that needs the
+host to have outbound network access, since they are fetched from Unsplash and
+Wikimedia by the image optimizer. Every host above has it; this build container
+does not, which is why they cannot be verified from here.
+
 ## What production currently tracks
 
 Railway's `app` service is wired to the repository with:
