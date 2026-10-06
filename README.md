@@ -178,6 +178,18 @@ system.
 - `docs/ENVIRONMENT.md` — every variable
 - `docs/DEPLOYMENT.md` — deploying to Vercel or anywhere else
 
+**Reviews, reports and how to test it**
+- `docs/TEST-GUIDE.md` — ten ordering scenarios, step by step, with the staff
+  accounts and the expected result of each
+- `docs/REPORT-2026-10.md` — the current state, what changed last, how to
+  verify it, and what is blocked on whom
+- `docs/REVIEW-2026-10.md` — the team-lead pass over the whole repository,
+  with the evidence for each finding
+- `docs/IMPROVEMENTS.md` — the plan that review produced, and what is done
+- `docs/COMPETITIVE-ANALYSIS.md` — measured against the reference build and
+  the ordering sites worth copying
+- `docs/AUDIT-2026-09.md` — the earlier audit of the live site
+
 **The source material**
 - `docs/PROJECT_ORIGIN.md` — the original vision document
 - `docs/PRD.md` — the full product requirements

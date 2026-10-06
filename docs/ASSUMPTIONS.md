@@ -56,13 +56,38 @@ device asks for. The two hostnames are named explicitly in `next.config.ts`;
 a wildcard there would turn this server into an open image proxy with the
 restaurant's name on it.
 
+**Six of the seven Wikimedia photographs require attribution,** and those
+licences are not decorative: CC BY 2.0 (Fatayer, Nutella pizza, potato
+wedges), CC BY-SA 2.0 (mozzarella sticks), CC BY-SA 3.0 (garlic bread) and
+CC BY-SA 4.0 (za'atar fatayer) all oblige the photographer to be named
+wherever the work appears. Only Sfiha2.jpg is public domain, and Unsplash's
+licence asks for nothing. For a while the site used all of them with no
+credit anywhere, which is a breach the restaurant would have carried rather
+than the agency that built the page. The credit is now at `/credits`, linked
+from the footer of every page, and `src/lib/photo-credits.ts` holds the list.
+`tests/integration/photo-credits.test.ts` fails if a dish is given a
+Wikimedia photograph with no entry there — because nothing else connects a
+row in the database to a name on a page.
+
 **The three branded drinks keep a clean vector bottle, deliberately.** The
-obvious move is a stock photo of a Pepsi can, and it is the wrong one: the
-best-licensed photograph available shows a *Pepsi Lime Zero Sugar* can, which
-is a different product from the one the restaurant sells. A customer ordering
-a cold Pepsi and being shown a lime zero-sugar can is a factual error on a
-menu, not a stylistic preference. Every large chain uses a neutral product
-icon for exactly this reason.
+obvious move is a stock photo of a Pepsi can, and it is the wrong one. Each
+of the three was checked against what is actually available:
+
+| Item | Best licensed photograph | Why it is not used |
+|---|---|---|
+| Cold Pepsi, 330 ml can | `Pepsi_lime_330ml_can-front` | A *Pepsi Lime Zero Sugar* can — a different product |
+| Cold 7-Up, 330 ml can | `7up_1.jpg` (CC BY 2.0, correct product) | A **bottle**; the menu sells a can |
+| Drinking water, 500 ml | `…Vita_Pure_Distilled_Water_500ml…` | A specific Hong Kong brand, for an item that names no brand |
+
+The reference build at `pizza-house66.ai.studio` ships all three anyway,
+including the Pepsi Lime can for a plain Pepsi — which is how the problem was
+found rather than assumed.
+
+A customer ordering a cold Pepsi and being shown a lime zero-sugar can is a
+factual error on a menu, not a stylistic preference. A correct bottle beats a
+wrong photograph, and every large chain uses a neutral product image for
+exactly this reason. All three are one upload away from being right the
+moment the restaurant photographs its own fridge.
 
 These photographs are stand-ins, not the end state.
 
