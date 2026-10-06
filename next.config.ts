@@ -5,7 +5,9 @@ const nextConfig: NextConfig = {
   // restaurant's ordering system is not the place to discover one at
   // runtime. (Next.js 16 removed the `eslint` config key along with
   // `next lint`; linting runs as its own npm script instead.)
-  typescript: { ignoreBuildErrors: false },
+  // Errors are never ignored. `tsconfigPath` points the build's type check at
+  // the app, not at the test suite — see the comment in tsconfig.build.json.
+  typescript: { ignoreBuildErrors: false, tsconfigPath: "tsconfig.build.json" },
 
   images: {
     // Two hosts, both named explicitly. A wildcard here would let any URL a

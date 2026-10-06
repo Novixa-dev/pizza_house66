@@ -224,6 +224,44 @@ since a screenshot of the actual failure beats reading a log.
 The environment variables in the workflow are test-only values on an
 ephemeral runner. No real secret is needed to run CI, and none is referenced.
 
+### Two things pass locally and fail on a fresh checkout
+
+The first time Actions actually ran, `static` and `production-build` both
+failed on code that had been green locally for weeks. Neither was a code
+fault; both were the same mistake in different clothes — **a check that only
+passed because an earlier command had left a file behind.**
+
+**`PageProps` and `LayoutProps` are generated, not imported.** Next 16 writes
+them into `.next/types` during `next dev`, `next build` or `next typegen`.
+Every developer machine has run one of those, so `tsc --noEmit` finds them;
+a clean CI checkout has no `.next` and reports 12 `Cannot find name
+'PageProps'` errors. So `npm run typecheck` is `next typegen && tsc
+--noEmit` — it generates what it needs rather than inheriting it. Run it
+after `rm -rf .next` if you ever want to see the difference.
+
+**`next build` type-checks whatever its tsconfig selects — including tests.**
+`tsconfig.json` deliberately covers `tests/**`, which is right for the editor
+and for `npm run typecheck`. It is wrong for the production build, where
+`vitest` and `@playwright/test` are not installed: the build failed on the
+test files, not on anything it ships. Hence `tsconfig.build.json`, named by
+`typescript.tsconfigPath` in `next.config.ts`. It relaxes nothing — same
+strict options, fewer files.
+
+A consequence worth knowing: anything `next build` resolves is a real
+dependency, type packages included. `typescript`, `@types/node`,
+`@types/react` and `@types/react-dom` sit in `dependencies` for that reason,
+exactly as `@tailwindcss/postcss` does.
+
+To reproduce either job before pushing:
+
+```bash
+rm -rf .next && npm run typecheck      # the static job's first step
+npm ci --omit=dev && npm run build     # the production-build job
+```
+
+The second command removes your devDependencies — `npm ci` afterwards puts
+them back. Running it in a scratch copy of the repository is less disruptive.
+
 ---
 
 ## When adding a feature
