@@ -47,7 +47,7 @@ illustrative ones. The seeded staff accounts still use the deployment's
 | Arabic / English | ✅ | Full RTL, both languages complete |
 | PWA install | ✅ | Installable; deliberately not offline |
 | Find an order again | ✅ | `/orders` — kept in the browser for 30 days, recoverable by reference + phone |
-| Reorder from history | ✅ | Rebuilt from live rows at today's prices; an unavailable item is named, not dropped |
+| Reorder from history | ✅ | Rebuilt from live rows at today's prices; an unavailable item is named, not dropped. Surfaced on the home page for a returning visitor |
 | Offers and coupons | ✅ | `/offers`, public offers plus a coupon issued on the 5th completed order |
 | Phone order bar | ✅ | Carries the basket count and total; hidden on cart, checkout and desktop |
 | About / contact / FAQ / legal | ✅ | Plus a staff sign-in link in the footer |
@@ -105,8 +105,8 @@ illustrative ones. The seeded staff accounts still use the deployment's
 
 | Item | Status |
 |---|---|
-| Unit + integration tests (234) | ✅ |
-| E2E tests (128, two viewports/languages) | ✅ one skipped by design — a phone-only test on the desktop project |
+| Unit + integration tests (240) | ✅ |
+| E2E tests (132, two viewports/languages) | ✅ one skipped by design — a phone-only test on the desktop project |
 | Lint, typecheck, build | ✅ clean |
 | CI pipeline | ✅ `.github/workflows/ci.yml` — ran for the first time on 2026-10-01 and found two real faults; both fixed, see `docs/TESTING.md` |
 | Accessibility | ✅ axe-core WCAG 2.1 A/AA in CI, light and dark, plus no-horizontal-overflow at phone width |
@@ -171,17 +171,12 @@ wrong photograph.
 
 In the order I would do it:
 
-1. **"Order this again" on the home page.** The logic is built and tested;
-   it is reachable from the nav and not from the first screen a returning
-   customer sees. Chipotle moved it to the top of their homepage after their
-   research found reorder dominates behaviour — the cheapest remaining change
-   with evidence behind it (`docs/COMPETITIVE-ANALYSIS.md` ف-١).
-2. **Per-language URLs** (`app/[lang]/…`). The highest-value structural
+1. **Per-language URLs** (`app/[lang]/…`). The highest-value structural
    change — it is what makes both languages indexable, and it is additive
    (`docs/SEO.md`).
-3. **WhatsApp order notifications.** The notification records already exist;
+2. **WhatsApp order notifications.** The notification records already exist;
    only delivery is missing. In Yemen this is the channel customers actually
    read.
-4. **Printable kitchen tickets**, if the restaurant has a printer.
-5. **Shared-store rate limiting**, before the deployment ever scales past one
+3. **Printable kitchen tickets**, if the restaurant has a printer.
+4. **Shared-store rate limiting**, before the deployment ever scales past one
    instance.
