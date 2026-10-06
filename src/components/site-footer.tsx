@@ -151,6 +151,13 @@ export function SiteFooter({
             <Link href="/privacy" className="inline-flex min-h-6 items-center hover:text-brand">
               {t.pages.privacyTitle}
             </Link>
+            {/* Not a courtesy: the CC BY and CC BY-SA photographs on the menu
+                require their photographers to be credited wherever they
+                appear, and the footer is what makes that credit reachable
+                from every page. */}
+            <Link href="/credits" className="inline-flex min-h-6 items-center hover:text-brand">
+              {t.pages.creditsTitle}
+            </Link>
             <Link
               href="/admin"
               className="inline-flex min-h-6 items-center gap-1.5 font-semibold hover:text-brand"

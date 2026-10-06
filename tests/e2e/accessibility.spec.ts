@@ -400,6 +400,7 @@ test.describe("touch targets — WCAG 2.2 SC 2.5.8", () => {
     "/faq",
     "/terms",
     "/privacy",
+    "/credits",
   ];
 
   for (const path of PAGES) {
