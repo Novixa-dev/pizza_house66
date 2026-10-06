@@ -4,7 +4,8 @@ import { prisma } from "@/lib/db";
 import { getRestaurant } from "./restaurant";
 import { getFunnel } from "./analytics";
 import { ACTIVE_ORDER_STATUSES, RELEASED_SLOT_STATUSES } from "@/lib/order-state";
-import { addDays, getZonedParts, startOfZonedDay, zonedTimeToUtc } from "@/lib/time";
+import { addDays, startOfZonedDay, zonedTimeToUtc } from "@/lib/time";
+import { Prisma } from "@prisma/client";
 import type { OrderStatus, PaymentMethodType, PaymentStatus, PickupMode } from "@prisma/client";
 
 // Read models for the staff screens.
@@ -176,16 +177,40 @@ export async function listOrders(filters: OrderFilters = {}) {
   return { orders, total, page, pageSize, pageCount: Math.max(1, Math.ceil(total / pageSize)) };
 }
 
-/** The payment verification queue — the cashier's main screen. */
-export async function listPaymentsForReview() {
-  return prisma.payment.findMany({
-    where: { method: "BANK_TRANSFER", status: { in: ["PENDING", "PROCESSING"] } },
-    orderBy: { createdAt: "asc" },
-    include: {
-      receipt: { select: { id: true, contentType: true, byteSize: true, uploadedAt: true } },
-      order: { select: { id: true, reference: true, guestName: true, guestPhone: true, totalMinor: true, currency: true, status: true, requestedPickupAt: true } },
-    },
-  });
+/** How many pending transfers the cashier's screen loads at once. */
+export const PAYMENT_QUEUE_LIMIT = 60;
+
+/**
+ * The payment verification queue — the cashier's main screen.
+ *
+ * Capped on purpose. The backlog only grows while nobody is reviewing, so an
+ * unbounded query makes this screen slowest exactly when it most needs to
+ * open: after a holiday weekend it would fetch every pending transfer, each
+ * with its receipt metadata and its order, in one round trip. The queue is
+ * worked oldest-first, so the cap keeps the ones that have waited longest,
+ * and `waiting` reports the real size of the backlog so the page can say how
+ * many sit behind the cap rather than quietly dropping them.
+ */
+export async function listPaymentsForReview(limit = PAYMENT_QUEUE_LIMIT) {
+  const where = {
+    method: "BANK_TRANSFER" as const,
+    status: { in: ["PENDING", "PROCESSING"] as PaymentStatus[] },
+  };
+
+  const [payments, waiting] = await Promise.all([
+    prisma.payment.findMany({
+      where,
+      orderBy: { createdAt: "asc" },
+      take: limit,
+      include: {
+        receipt: { select: { id: true, contentType: true, byteSize: true, uploadedAt: true } },
+        order: { select: { id: true, reference: true, guestName: true, guestPhone: true, totalMinor: true, currency: true, status: true, requestedPickupAt: true } },
+      },
+    }),
+    prisma.payment.count({ where }),
+  ]);
+
+  return { payments, waiting, hidden: Math.max(0, waiting - payments.length) };
 }
 
 export async function listRecentlyReviewedPayments(limit = 10) {
@@ -267,64 +292,121 @@ export interface ReportSummary {
   funnel: Awaited<ReturnType<typeof getFunnel>>;
 }
 
+/**
+ * The management report.
+ *
+ * Every figure here is aggregated by the database. An earlier version read
+ * every order in the range into Node and summed it in JavaScript, which is
+ * fine for a day and ruinous for a year: the one report a manager runs least
+ * often is the one that would pull the most rows. The two aggregates the
+ * query builder cannot express — the repeat-customer rate, which counts
+ * customers rather than orders, and the peak-hour histogram, which has to
+ * bucket by hour in the restaurant's timezone — are written as SQL rather
+ * than resurrecting the in-memory pass for their sake.
+ */
 export async function getReportSummary(range: ReportRange): Promise<ReportSummary> {
   const restaurant = await getRestaurant();
   const window = { gte: range.start, lte: range.end };
 
-  const [orders, itemRows, paymentRows, pickupRows, funnel] = await Promise.all([
-    prisma.order.findMany({
-      where: { createdAt: window },
-      select: { id: true, status: true, totalMinor: true, createdAt: true, customerId: true },
-    }),
-    prisma.orderItem.groupBy({
-      by: ["nameEn", "nameAr"],
-      where: { order: { createdAt: window, status: { notIn: RELEASED_SLOT_STATUSES } } },
-      _sum: { quantity: true, lineTotalMinor: true },
-      orderBy: { _sum: { quantity: "desc" } },
-      take: 8,
-    }),
-    prisma.payment.groupBy({
-      by: ["method"],
-      where: { order: { createdAt: window } },
-      _count: { _all: true },
-    }),
-    prisma.order.groupBy({
-      by: ["pickupMode"],
-      where: { createdAt: window },
-      _count: { _all: true },
-    }),
-    getFunnel(range.start, range.end),
-  ]);
+  // The same window and billable filter the Prisma calls below express, for
+  // the two queries written by hand. `createdAt` is a timestamp without time
+  // zone holding UTC: an ISO string cast to `timestamp` keeps that reading
+  // whatever the session timezone happens to be, where binding a Date would
+  // leave Postgres to convert it. The status column is cast to text because
+  // the parameters arrive as text and Postgres will not compare them to the
+  // enum directly.
+  const windowSql = Prisma.sql`"createdAt" >= ${range.start.toISOString()}::timestamp
+          AND "createdAt" <= ${range.end.toISOString()}::timestamp`;
+  const billableSql = Prisma.sql`"status"::text NOT IN (${Prisma.join(RELEASED_SLOT_STATUSES)})`;
 
-  const billable = orders.filter((order) => !RELEASED_SLOT_STATUSES.includes(order.status));
-  const revenue = billable.reduce((sum, order) => sum + order.totalMinor, 0);
-  const completed = orders.filter((order) => order.status === "COMPLETED").length;
-  const cancelled = orders.filter((order) => RELEASED_SLOT_STATUSES.includes(order.status)).length;
+  const [statusRows, itemRows, paymentRows, pickupRows, customerRows, hourRows, funnel] =
+    await Promise.all([
+      // One row per status: order count and takings for the whole range, in
+      // at most as many rows as OrderStatus has members.
+      prisma.order.groupBy({
+        by: ["status"],
+        where: { createdAt: window },
+        _count: { _all: true },
+        _sum: { totalMinor: true },
+      }),
+      prisma.orderItem.groupBy({
+        by: ["nameEn", "nameAr"],
+        where: { order: { createdAt: window, status: { notIn: RELEASED_SLOT_STATUSES } } },
+        _sum: { quantity: true, lineTotalMinor: true },
+        orderBy: { _sum: { quantity: "desc" } },
+        take: 8,
+      }),
+      prisma.payment.groupBy({
+        by: ["method"],
+        where: { order: { createdAt: window } },
+        _count: { _all: true },
+      }),
+      prisma.order.groupBy({
+        by: ["pickupMode"],
+        where: { createdAt: window },
+        _count: { _all: true },
+      }),
+      // A "repeat customer" is one who appears on more than one billable
+      // order in the window — a crude but honest measure. Counted in the
+      // database so the answer is two integers rather than a row per order.
+      prisma.$queryRaw<{ customers: number; repeated: number }[]>`
+        SELECT count(*)::int AS "customers",
+               count(*) FILTER (WHERE "orders" > 1)::int AS "repeated"
+        FROM (
+          SELECT "customerId", count(*) AS "orders"
+            FROM "Order"
+           WHERE ${windowSql}
+             AND ${billableSql}
+             AND "customerId" IS NOT NULL
+           GROUP BY "customerId"
+        ) AS "per_customer"
+      `,
+      // Peak hours are counted in restaurant-local time — a UTC histogram
+      // would show a rush three hours off from the one the staff lived
+      // through. The stored value is labelled UTC before being converted, so
+      // the bucket does not depend on the server's timezone either.
+      prisma.$queryRaw<{ hour: number; count: number }[]>`
+        SELECT EXTRACT(
+                 HOUR FROM "createdAt" AT TIME ZONE 'UTC' AT TIME ZONE ${restaurant.timezone}
+               )::int AS "hour",
+               count(*)::int AS "count"
+          FROM "Order"
+         WHERE ${windowSql}
+           AND ${billableSql}
+         GROUP BY 1
+         ORDER BY 1
+      `,
+      getFunnel(range.start, range.end),
+    ]);
 
-  // A "repeat customer" is one who appears on more than one order in the
-  // window — a crude but honest measure without a loyalty system.
-  const perCustomer = new Map<string, number>();
-  for (const order of billable) {
-    if (!order.customerId) continue;
-    perCustomer.set(order.customerId, (perCustomer.get(order.customerId) ?? 0) + 1);
+  const released = new Set<OrderStatus>(RELEASED_SLOT_STATUSES);
+  let total = 0;
+  let billable = 0;
+  let revenue = 0;
+  let completed = 0;
+  let cancelled = 0;
+  for (const row of statusRows) {
+    const count = row._count._all;
+    total += count;
+    if (released.has(row.status)) {
+      cancelled += count;
+      continue;
+    }
+    billable += count;
+    revenue += row._sum.totalMinor ?? 0;
+    if (row.status === "COMPLETED") completed = count;
   }
-  const repeatCustomers = [...perCustomer.values()].filter((count) => count > 1).length;
 
-  // Peak hours are counted in restaurant-local time — a UTC histogram would
-  // show a rush three hours off from the one the staff lived through.
-  const hourCounts = new Map<number, number>();
-  for (const order of billable) {
-    const { hour } = getZonedParts(order.createdAt, restaurant.timezone);
-    hourCounts.set(hour, (hourCounts.get(hour) ?? 0) + 1);
-  }
+  const customers = customerRows[0]?.customers ?? 0;
+  const repeated = customerRows[0]?.repeated ?? 0;
 
   return {
-    orders: orders.length,
+    orders: total,
     revenueMinor: revenue,
-    avgOrderValueMinor: billable.length > 0 ? Math.round(revenue / billable.length) : 0,
-    completionRate: orders.length > 0 ? completed / orders.length : 0,
-    cancellationRate: orders.length > 0 ? cancelled / orders.length : 0,
-    repeatCustomerRate: perCustomer.size > 0 ? repeatCustomers / perCustomer.size : 0,
+    avgOrderValueMinor: billable > 0 ? Math.round(revenue / billable) : 0,
+    completionRate: total > 0 ? completed / total : 0,
+    cancellationRate: total > 0 ? cancelled / total : 0,
+    repeatCustomerRate: customers > 0 ? repeated / customers : 0,
     currency: restaurant.currency,
     topProducts: itemRows.map((row) => ({
       name: row.nameEn,
@@ -334,9 +416,7 @@ export async function getReportSummary(range: ReportRange): Promise<ReportSummar
     })),
     paymentMix: paymentRows.map((row) => ({ method: row.method, count: row._count._all })),
     pickupMix: pickupRows.map((row) => ({ mode: row.pickupMode, count: row._count._all })),
-    peakHours: [...hourCounts.entries()]
-      .map(([hour, count]) => ({ hour, count }))
-      .sort((a, b) => a.hour - b.hour),
+    peakHours: hourRows.map((row) => ({ hour: row.hour, count: row.count })),
     funnel,
   };
 }
