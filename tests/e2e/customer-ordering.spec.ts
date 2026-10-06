@@ -288,3 +288,46 @@ test.describe("customer ordering", () => {
     expect(await robots.text()).toContain("/order/");
   });
 });
+
+// The phone-only bottom bar. Worth its own test because its whole value is
+// conditional — it has to appear when there is something to carry and get out
+// of the way when the page it points at is the page you are on — and because
+// a fixed element is the easiest way to cover a page's last control by
+// accident.
+test.describe("the phone order bar", () => {
+  test("carries the basket forward, and stays out of the way of the cart", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== "mobile-ar",
+      "the bar is phone-width only by design"
+    );
+
+    const bar = page.getByTestId("sticky-order-bar");
+
+    await page.goto("/menu");
+    await expect(bar).toBeHidden(); // an empty basket has nothing to carry
+
+    await addPizzaToCart(page); // which lands on /cart
+    await expect(bar).toBeHidden(); // where the bar would only repeat itself
+
+    await page.goto("/menu");
+    await expect(bar).toBeVisible();
+    await expect(bar).toContainText("1");
+
+    // The tap target, not just the bar: docs/DESIGN-SYSTEM.md commits to 44px
+    // on the primary path, and this is now the shortest route to checkout.
+    const target = bar.getByRole("link");
+    const box = await target.boundingBox();
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+
+    // It must not be the thing that makes a phone page scroll sideways.
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+
+    await target.click();
+    await expect(page).toHaveURL(/\/cart/);
+  });
+});

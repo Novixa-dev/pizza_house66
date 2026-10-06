@@ -3,6 +3,7 @@ import { getRestaurant, restaurantStatus } from "@/server/restaurant";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { PageViewTracker } from "@/components/analytics-tracker";
+import { StickyOrderBar } from "@/components/sticky-order-bar";
 
 /**
  * Shell for every customer-facing page.
@@ -23,10 +24,14 @@ export default async function SiteLayout({ children }: LayoutProps<"/">) {
         isOpen={status.open}
         ordersPaused={restaurant.onlineOrderingPaused}
       />
-      <main id="main" className="flex-1">
+      {/* The bottom padding is the height the sticky bar occupies on a phone,
+          so the bar never covers the end of the page. It costs nothing from
+          `sm:` up, where the bar does not render. */}
+      <main id="main" className="flex-1 pb-20 sm:pb-0">
         {children}
       </main>
       <SiteFooter locale={locale} restaurant={restaurant} />
+      <StickyOrderBar locale={locale} currency={restaurant.currency} />
       <PageViewTracker />
     </>
   );
