@@ -77,6 +77,11 @@ export default async function ContactPage() {
     <div className="container-page max-w-4xl py-10">
       <SectionHeading level={1} title={t.pages.contactTitle} subtitle={t.pages.contactLead} />
 
+      {/* The restaurant's own Instagram bio reads "orders and reservations" next
+          to these two numbers, so the page says the same thing a visitor has
+          already been told there. */}
+      <p className="mb-4 text-sm font-semibold text-ink-soft">{t.pages.reservations}</p>
+
       <ul className="grid gap-3 sm:grid-cols-2">
         {channels.map((channel) => (
           <li key={channel.label}>
@@ -117,6 +122,16 @@ export default async function ContactPage() {
           ))}
         </dl>
       </Card>
+
+      {/* The restaurant has publicly posted that this is its only branch and
+          that it has no connection to others using the name. A different
+          business, "Pizza House Umm al-Hamam", has its own number and its own
+          menu — so a customer searching the name can land on the wrong one.
+          Saying it here, where they look for a phone number, is the cheapest
+          place to stop that. */}
+      <p className="mt-6 rounded-[var(--radius-sm)] bg-surface-muted px-4 py-3 text-sm text-ink-soft">
+        {t.pages.onlyBranch}
+      </p>
     </div>
   );
 }

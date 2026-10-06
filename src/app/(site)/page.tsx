@@ -395,7 +395,10 @@ function StructuredData({
           ? { "@type": "GeoCoordinates", latitude: restaurant.latitude, longitude: restaurant.longitude }
           : undefined,
       openingHours: toSchemaOpeningHours(restaurant.businessHours),
-      acceptsReservations: false,
+      // Deliberately unset. This used to say `false`, but the restaurant's own
+      // Instagram bio reads "for orders and reservations" — so false was a claim
+      // its owner contradicts. It is not `true` either: this site has no booking
+      // flow, and `true` invites Google to look for one.
       potentialAction: {
         "@type": "OrderAction",
         target: { "@type": "EntryPoint", urlTemplate: absoluteUrl("/menu") },
