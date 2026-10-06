@@ -632,11 +632,11 @@ Pizza House can supply. `docs/HANDOVER.md` walks through them in order.
 
 | # | Needed | Why it blocks launch |
 |---|---|---|
-| 1 | Real menu, prices, descriptions | Everything seeded is illustrative |
-| 2 | Real business hours | Seeded as 16:00–00:00 daily |
+| 1 | Real menu, prices, descriptions | We have 16 items; the restaurant's own delivery-app listing shows ~184 (`docs/FIELD-RESEARCH-2026-10.md`). Ask the owner to export it |
+| 2 | Confirm closing time | Google says 23:00, we use 23:30 |
 | 3 | Real prep time per product | The scheduling promise is only as good as these |
 | 4 | Real slot capacity | What the kitchen can actually cook per 15 minutes |
-| 5 | Real contact details and address | Phone, WhatsApp, address, map, coordinates |
+| 5 | ~~Real contact details and address~~ | Done — checked against Google Maps and Instagram |
 | 6 | Bank transfer details | Checked character by character |
 | 7 | Food photography | Current images are illustrations |
 | 8 | Staff list and roles | So real accounts replace the demo ones |

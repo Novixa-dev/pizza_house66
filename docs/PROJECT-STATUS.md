@@ -105,8 +105,8 @@ illustrative ones. The seeded staff accounts still use the deployment's
 
 | Item | Status |
 |---|---|
-| Unit + integration tests (240) | ✅ |
-| E2E tests (132, two viewports/languages) | ✅ one skipped by design — a phone-only test on the desktop project |
+| Unit + integration tests (242) | ✅ |
+| E2E tests (140, two viewports/languages) | ✅ 139 pass; one skipped by design — a phone-only test on the desktop project |
 | Lint, typecheck, build | ✅ clean |
 | CI pipeline | ✅ `.github/workflows/ci.yml` — ran for the first time on 2026-10-01 and found two real faults; both fixed, see `docs/TESTING.md` |
 | Accessibility | ✅ axe-core WCAG 2.1 A/AA in CI, light and dark, plus no-horizontal-overflow at phone width |
@@ -145,25 +145,30 @@ Pizza House can supply.
 |---|---|---|
 | 1 | **A Railway plan, or a move to another host** | The site is off. Nothing ships until this is decided — `docs/DEPLOYMENT.md` |
 | 2 | **A database dump, before anything else** | That volume is the only copy of the restaurant's order history, and it is attached to an expired trial |
-| 3 | **The Claude GitHub App installed on the organization** | Commits cannot be pushed, so CI cannot re-run against the fixes — `https://github.com/apps/claude/installations/select_target` |
+| 3 | **The restaurant's real menu** — ideally exported from its delivery-app dashboard | We carry 16 items; the restaurant has ~184. Orders for anything not on our menu cannot be taken — `docs/FIELD-RESEARCH-2026-10.md` |
 
 ### Still needed, not blocking today
 
 | # | What is needed | Why it matters |
 |---|---|---|
+| 3a | **Closing time: 23:00 or 23:30?** | Google Maps says 11 PM, our hours say 11:30 PM |
 | 4 | **Real prep times per product** | The scheduling promise is only as good as these numbers |
 | 5 | **Real slot capacity** | How many orders the kitchen can actually cook per 15 minutes |
 | 6 | **Bank transfer details** | Bank name, account number, account holder |
 | 7 | **Staff list and roles** | So real accounts replace the seeded ones — a shared password is not an account |
 | 8 | **A domain** | For canonical URLs and the Google Business Profile |
 
-### Supplied already
+### Supplied already, and checked
 
-The menu, prices and descriptions; the two daily trading sessions and the
-Friday pattern; the address, phone and WhatsApp; and food photographs for 13
-of 16 items. The three remaining items are branded drinks, where the stock
-photography available was of the wrong product — a correct bottle beats a
-wrong photograph.
+The address, phone, WhatsApp, Instagram and map pin — checked against the
+restaurant's own Google Maps listing and Instagram profile — and the two
+daily sessions. Food photographs cover 13 of 16 items; the three branded
+drinks keep a vector bottle because the stock photograph available for each
+was of a different product.
+
+**Not supplied, despite earlier notes saying so: the menu.** The 16 items come
+from an early prototype; the restaurant's own delivery-app listing shows
+roughly 184. See `docs/FIELD-RESEARCH-2026-10.md`.
 
 `docs/HANDOVER.md` walks through the outstanding items in order.
 

@@ -18,7 +18,6 @@ assumed to be a known gap.
 | Area | What is used now | Source |
 |---|---|---|
 | Restaurant name | بيتزا هاوس 66 / Pizza House 66 | Client listing and Instagram handle |
-| Menu and prices | 16 items in 5 categories, YER prices from 400 to 5,500 | Client's published menu |
 | Business hours | 08:00–12:00 and 16:00–23:30 daily; **Friday evening only** | Client's published hours |
 | Phone | `05375561` (landline) | Client listing |
 | WhatsApp | `+967 772207788` | Client listing |
@@ -30,6 +29,8 @@ assumed to be a known gap.
 
 | Area | What is currently used | Where it lives | Confirm before launch |
 |---|---|---|---|
+| **Menu and prices** | **16 items from an early prototype.** The restaurant's own delivery-app listing shows ~184 (41+ pizzas with local flavours and a "House" size tier, ~40 drinks, 12 add-ons), and prices differ in both directions | Products → **Products** | **Yes — the biggest open item.** `docs/FIELD-RESEARCH-2026-10.md` §4 |
+| **Closing time** | 23:30 | **Hours** | **Yes** — Google Maps says 11 PM, the prototype says 11:30 PM |
 | Preparation times | 20 min default; 1–8 min for drinks, sides and desserts | Per product → **Products** | **Yes** — the scheduling promise depends on these |
 | Slot interval | 15 minutes | `Restaurant.slotIntervalMinutes` → **Settings** | Probably fine; confirm |
 | Slot capacity | 10 orders per 15-minute window | `Restaurant.slotCapacity` → **Settings** | **Yes** — this is what protects the kitchen |
@@ -37,7 +38,7 @@ assumed to be a known gap.
 | Minimum order | 0 (none) | `Restaurant.minOrderMinor` → **Settings** | Confirm |
 | Currency subunit | YER, treated as having no practical subunit | `Restaurant.currency` → **Settings** | Confirm |
 | Timezone | `Asia/Aden` (UTC+3, no DST) | `Restaurant.timezone` → **Settings** | Confirm — the whole schedule is evaluated in it |
-| Map pin | A search link, not a dropped pin with coordinates | `Restaurant.mapUrl`, `latitude`, `longitude` → **Settings** | **Yes** — ask for the exact pin |
+| Map pin | **Done** — the restaurant's own Google Maps listing, coordinates 14.4891696, 49.0444845 | `Restaurant.mapUrl`, `latitude`, `longitude` → **Settings** | No |
 | Email | None set; the restaurant may not use one | `Restaurant.email` → **Settings** | Confirm |
 | Facebook | None set | `Restaurant.facebookUrl` → **Settings** | Confirm whether one exists |
 | Public holidays | None entered | **Hours → Overrides** | **Yes** — Eid in particular |
