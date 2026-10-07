@@ -63,7 +63,7 @@ illustrative ones. The seeded staff accounts still use the deployment's
 | Dashboard | ✅ | Today's revenue, counts, live queue, upcoming pickups |
 | Orders list + detail | ✅ | Filters, transitions, cancellation |
 | Payment verification | ✅ | Queue, receipt viewing, verify/reject with reason |
-| Products CRUD | ✅ | Including option groups and values |
+| Products CRUD | ✅ | Including option groups and values. The list has name search, an availability filter with a count per state, and rows that wrap on a phone — built for the real menu's ~184 items. Search (here and on the customer's menu) forgives how Arabic is typed — ه for ة, ا for أ |
 | Categories CRUD | ✅ | |
 | Promotions CRUD | ✅ | Percentage/fixed, minimum, cap, window, usage limit, scoping |
 | Customers | ✅ | Order history by phone |
@@ -105,10 +105,10 @@ illustrative ones. The seeded staff accounts still use the deployment's
 
 | Item | Status |
 |---|---|
-| Unit + integration tests (298) | ✅ |
-| E2E tests (140, two viewports/languages) | ✅ 139 pass; one skipped by design — a phone-only test on the desktop project |
+| Unit + integration tests (321) | ✅ 250 unit + 71 integration |
+| E2E tests (160 = 80 × two viewports/languages) | ✅ 159 pass; one skipped by design — a phone-only test on the desktop project |
 | Lint, typecheck, build | ✅ clean |
-| CI pipeline | ✅ `.github/workflows/ci.yml` — ran for the first time on 2026-10-01 and found two real faults; both fixed, see `docs/TESTING.md` |
+| CI pipeline | ✅ `.github/workflows/ci.yml` — four jobs, green on the working branch's pushed head (read from GitHub). Its first real runs found two faults that were invisible locally; both fixed, see `docs/TESTING.md` |
 | Accessibility | ✅ axe-core WCAG 2.1 A/AA in CI, light and dark, plus no-horizontal-overflow at phone width |
 | Visual regression | ⬜ |
 | Load testing | ⬜ |
