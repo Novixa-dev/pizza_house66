@@ -112,8 +112,8 @@ sitting with them. No developer, no deployment.
       restaurant's own listing on a delivery app shows roughly 184 (about 41
       pizzas with local flavours, ~40 drinks, 12 add-ons, pastries, burgers),
       so this is days by hand: **export it from that app's partner dashboard
-      and give us the file** — a CSV importer is the first item in
-      `docs/FIELD-RESEARCH-2026-10.md` §6
+      and give us the file**, then load it with `npm run menu:import`
+      (`docs/MENU-IMPORT.md` — dry run first, new items arrive hidden)
 - [ ] **Options** — the real size/crust/add-on groups per product
 - [ ] **Promotions** — delete the demo promotions; add real ones or none
 - [ ] **Staff** — create real accounts; **delete every `@pizzahouse.local`

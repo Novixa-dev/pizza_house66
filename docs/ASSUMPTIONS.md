@@ -29,7 +29,7 @@ assumed to be a known gap.
 
 | Area | What is currently used | Where it lives | Confirm before launch |
 |---|---|---|---|
-| **Menu and prices** | **16 items from an early prototype.** The restaurant's own delivery-app listing shows ~184 (41+ pizzas with local flavours and a "House" size tier, ~40 drinks, 12 add-ons), and prices differ in both directions | Products → **Products** | **Yes — the biggest open item.** `docs/FIELD-RESEARCH-2026-10.md` §4 |
+| **Menu and prices** | **16 items from an early prototype.** The restaurant's own delivery-app listing shows ~184 (41+ pizzas with local flavours and a "House" size tier, ~40 drinks, 12 add-ons), and prices differ in both directions | Products → **Products** | **Yes — the biggest open item.** Evidence: `docs/FIELD-RESEARCH-2026-10.md` §4. Loader: `docs/MENU-IMPORT.md` |
 | **Closing time** | 23:30 | **Hours** | **Yes** — Google Maps says 11 PM, the prototype says 11:30 PM |
 | Preparation times | 20 min default; 1–8 min for drinks, sides and desserts | Per product → **Products** | **Yes** — the scheduling promise depends on these |
 | Slot interval | 15 minutes | `Restaurant.slotIntervalMinutes` → **Settings** | Probably fine; confirm |

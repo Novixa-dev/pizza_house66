@@ -192,6 +192,8 @@ system.
 - `docs/COMPETITIVE-ANALYSIS.md` — measured against the reference build and
   the ordering sites worth copying
 - `docs/AUDIT-2026-09.md` — the earlier audit of the live site
+- `docs/MENU-IMPORT.md` — load the restaurant's whole menu from a CSV
+  (`npm run menu:import`), with a dry run, no deletions and drafts by default
 - `docs/FIELD-RESEARCH-2026-10.md` — what the restaurant's own Google Maps,
   Instagram and delivery-app listing say, what changed because of it, and the
   open questions only the owner can answer

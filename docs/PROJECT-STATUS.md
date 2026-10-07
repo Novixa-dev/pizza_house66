@@ -105,7 +105,7 @@ illustrative ones. The seeded staff accounts still use the deployment's
 
 | Item | Status |
 |---|---|
-| Unit + integration tests (242) | ✅ |
+| Unit + integration tests (298) | ✅ |
 | E2E tests (140, two viewports/languages) | ✅ 139 pass; one skipped by design — a phone-only test on the desktop project |
 | Lint, typecheck, build | ✅ clean |
 | CI pipeline | ✅ `.github/workflows/ci.yml` — ran for the first time on 2026-10-01 and found two real faults; both fixed, see `docs/TESTING.md` |

@@ -22,6 +22,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "staff:create": "tsx scripts/create-staff.ts",
+    "menu:import": "tsx scripts/import-menu.ts",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
     "postinstall": "prisma generate",
     "build:next": "next build"
