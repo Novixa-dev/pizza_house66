@@ -489,6 +489,10 @@ const ar = {
 
   products: {
     title: "المنتجات",
+    searchPlaceholder: "ابحث باسم المنتج…",
+    filterAvailability: "تصفية بحسب التوفر",
+    noMatches: "لا توجد منتجات مطابقة.",
+    clearFilters: "إزالة التصفية",
     newProduct: "منتج جديد",
     editProduct: "تعديل المنتج",
     nameAr: "الاسم بالعربية",
@@ -1264,6 +1268,10 @@ const en: Dictionary = {
 
   products: {
     title: "Products",
+    searchPlaceholder: "Search by product name…",
+    filterAvailability: "Filter by availability",
+    noMatches: "No products match.",
+    clearFilters: "Clear filters",
     newProduct: "New product",
     editProduct: "Edit product",
     nameAr: "Name (Arabic)",

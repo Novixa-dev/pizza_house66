@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { AvailabilityState } from "@prisma/client";
 import type { Locale } from "@/lib/i18n/dictionaries";
 import { getDictionary } from "@/lib/i18n/dictionaries";
+import { matchesTokens, searchHaystack, searchTokens } from "@/lib/search";
 import { ProductCard } from "./product-card";
 import { EmptyState, Input } from "./ui";
 import { CategoryIcon, SearchIcon } from "./ui/icons";
@@ -51,22 +52,41 @@ export function MenuBrowser({
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
-  const normalizedQuery = query.trim().toLowerCase();
+  // Search forgives how Arabic is typed (ه for ة, ا for أ, ي for ى — see
+  // src/lib/search.ts): a customer whose phone typed the "wrong" one of those
+  // would otherwise be told the restaurant does not sell the thing it sells.
+  const tokens = useMemo(() => searchTokens(query), [query]);
+
+  // Folded once when the menu arrives rather than on every keystroke. At the
+  // restaurant's real size (~184 products, four fields each) that is the
+  // difference between a few hundred folds per key press and none.
+  const haystacks = useMemo(
+    () =>
+      new Map(
+        categories.flatMap((category) =>
+          category.products.map(
+            (product) =>
+              [
+                product.id,
+                searchHaystack(product.nameAr, product.nameEn, product.descriptionAr, product.descriptionEn),
+              ] as const,
+          ),
+        ),
+      ),
+    [categories],
+  );
 
   const filtered = useMemo(() => {
     return categories
       .filter((category) => !activeCategory || category.slug === activeCategory)
       .map((category) => ({
         ...category,
-        products: category.products.filter((product) => {
-          if (!normalizedQuery) return true;
-          return [product.nameAr, product.nameEn, product.descriptionAr, product.descriptionEn]
-            .filter(Boolean)
-            .some((field) => field!.toLowerCase().includes(normalizedQuery));
-        }),
+        products: category.products.filter((product) =>
+          matchesTokens(tokens, haystacks.get(product.id) ?? ""),
+        ),
       }))
       .filter((category) => category.products.length > 0);
-  }, [categories, activeCategory, normalizedQuery]);
+  }, [categories, activeCategory, tokens, haystacks]);
 
   const totalResults = filtered.reduce((sum, category) => sum + category.products.length, 0);
 
@@ -113,7 +133,7 @@ export function MenuBrowser({
 
       {filtered.length === 0 ? (
         <EmptyState
-          title={normalizedQuery ? t.menu.noResults : t.menu.noProducts}
+          title={tokens.length > 0 ? t.menu.noResults : t.menu.noProducts}
           icon={<SearchIcon />}
         />
       ) : (

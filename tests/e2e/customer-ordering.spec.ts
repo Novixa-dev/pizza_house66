@@ -105,6 +105,27 @@ test.describe("customer ordering", () => {
     await expect(page.locator('a[href="/product/pepsi"]')).toHaveCount(0);
   });
 
+  test("search forgives how Arabic is typed", async ({ page }) => {
+    await page.goto("/menu");
+    const search = page.getByRole("searchbox");
+
+    // The menu says الخاصة with a ta marbuta; a phone keyboard types الخاصه with
+    // a ha. A plain substring search answers "nothing found", and a customer
+    // reads that as "they do not sell it" — not as "my spelling differs".
+    await search.fill("الخاصه");
+    await expect(page.locator('a[href="/product/supreme"]')).toHaveCount(1);
+    await expect(page.locator('a[href="/product/pepsi"]')).toHaveCount(0);
+
+    // Every word has to match, in any order.
+    await search.fill("سوبريم بيتزا");
+    await expect(page.locator('a[href="/product/supreme"]')).toHaveCount(1);
+
+    // And a query that matches nothing says so instead of leaving a blank page.
+    await search.fill("زززز");
+    await expect(page.locator('a[href="/product/supreme"]')).toHaveCount(0);
+    await expect(page.locator('a[href^="/product/"]')).toHaveCount(0);
+  });
+
   test("a sold-out product is visible but not orderable", async ({ page }) => {
     // The condition is created here rather than seeded. It used to rely on
     // one product being permanently SOLD_OUT in the seed, which silently

@@ -95,6 +95,22 @@ test.describe("accessibility — staff screens", () => {
     await expectNoViolations(page);
   });
 
+  test("the admin product list has no WCAG A/AA violations", async ({ page }) => {
+    await signInAs(page, "owner@pizzahouse.local");
+    await page.goto("/admin/products");
+    await page.waitForLoadState("networkidle");
+    await expectNoViolations(page);
+  });
+
+  test("the admin product list has no violations with a filter applied", async ({ page }) => {
+    // The filtered state renders differently — chips marked current, a clear
+    // link — and is the one a manager actually sits in.
+    await signInAs(page, "owner@pizzahouse.local");
+    await page.goto("/admin/products?status=AVAILABLE&q=a");
+    await page.waitForLoadState("networkidle");
+    await expectNoViolations(page);
+  });
+
   test("the kitchen display has no WCAG A/AA violations", async ({ page }) => {
     await signInAs(page, "kitchen@pizzahouse.local");
     await page.goto("/kitchen");
@@ -201,6 +217,8 @@ test.describe("layout — no horizontal overflow at phone width", () => {
   for (const [path, label, email] of [
     ["/admin", "admin dashboard", "owner@pizzahouse.local"],
     ["/admin/orders", "admin orders", "owner@pizzahouse.local"],
+    // The real menu is ~184 products, so this is the longest staff page.
+    ["/admin/products", "admin products", "owner@pizzahouse.local"],
     ["/kitchen", "kitchen display", "kitchen@pizzahouse.local"],
   ] as const) {
     test(`${label} does not scroll sideways`, async ({ page }) => {
