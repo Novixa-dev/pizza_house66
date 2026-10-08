@@ -7,6 +7,7 @@ import { telLink, whatsappLink } from "@/lib/site";
 import type { RestaurantWithConfig } from "@/server/restaurant";
 import { InstagramIcon, LockIcon, PhoneIcon, PinIcon, WhatsappIcon } from "./ui/icons";
 import { formatOpeningHours } from "@/lib/hours-display";
+import { InstallPrompt } from "./install-prompt";
 
 export function SiteFooter({
   locale,
@@ -35,6 +36,17 @@ export function SiteFooter({
               {pick(locale, restaurant.taglineAr, restaurant.taglineEn)}
             </p>
           ) : null}
+          {/* Renders nothing unless this browser can actually install the app. */}
+          <div className="mt-4">
+            <InstallPrompt
+              labels={{
+                install: t.common.installApp,
+                hint: t.common.installAppHint,
+                ios: t.common.installIos,
+                done: t.common.installDone,
+              }}
+            />
+          </div>
         </div>
 
         <nav aria-label={t.nav.primary}>

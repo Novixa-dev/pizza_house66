@@ -9,6 +9,13 @@ const nextConfig: NextConfig = {
   // the app, not at the test suite — see the comment in tsconfig.build.json.
   typescript: { ignoreBuildErrors: false, tsconfigPath: "tsconfig.build.json" },
 
+  // The social-card renderer reads these at request time, which the file
+  // tracer cannot see. Without them a deployment that ships only the traced
+  // files answers every link preview and app icon with an error.
+  outputFileTracingIncludes: {
+    "/**": ["./src/assets/fonts/**", "./public/brand/logo.svg"],
+  },
+
   images: {
     // Two hosts, both named explicitly. A wildcard here would let any URL a
     // staff member pastes into the admin become an image this server fetches
@@ -40,6 +47,12 @@ const nextConfig: NextConfig = {
       // working, and a dead link is how a customer decides the order is lost.
       { source: "/track", destination: "/orders", permanent: true },
       { source: "/my-orders", destination: "/orders", permanent: true },
+      // Browsers ask for /favicon.ico whatever the page declares, and the file
+      // that used to answer was Next's own scaffold logo. The brand icon is
+      // generated at /icon; pointing the old path there keeps those requests
+      // from ending in a 404 in the logs. Temporary, because the icon URL is
+      // ours to change.
+      { source: "/favicon.ico", destination: "/icon", permanent: false },
     ];
   },
 

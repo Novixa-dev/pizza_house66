@@ -45,7 +45,9 @@ export async function generateMetadata({ params }: PageProps<"/product/[slug]">)
       title: name,
       description,
       url: absoluteUrl(`/product/${product.slug}`),
-      images: [{ url: absoluteUrl(productImageUrl(product)) }],
+      // No `images`: the card generated beside this page (its photograph,
+      // name and price) is attached automatically. Pointing at the raw photo
+      // instead sent SVG placeholders to WhatsApp, which cannot show them.
     },
   };
 }

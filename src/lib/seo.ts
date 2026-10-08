@@ -9,6 +9,8 @@ import type { Metadata } from "next";
 import type { Locale } from "./i18n/dictionaries";
 import { absoluteUrl } from "./site";
 
+const SHARE_CARD_ALT = "بيتزا هاوس المكلا — اطلب مسبقًا، استلم طازجًا";
+
 export function buildMetadata({
   title,
   description,
@@ -34,6 +36,11 @@ export function buildMetadata({
       url,
       type: "website",
       locale: locale === "ar" ? "ar_YE" : "en_US",
+      // Stated here, not inherited: a page that defines its own `openGraph`
+      // replaces the parent's, and the site-wide card (a file convention at
+      // the root) does not survive that. Every page built with this helper
+      // used to be shared as a bare title with no picture at all.
+      images: [{ url: absoluteUrl("/opengraph-image"), width: 1200, height: 630, alt: SHARE_CARD_ALT }],
     },
   };
 }

@@ -7,19 +7,14 @@ import { productImageUrl } from "@/lib/product-image";
 import { SectionHeading, Alert } from "@/components/ui";
 import { AlertIcon } from "@/components/ui/icons";
 import { MenuBrowser } from "@/components/menu-browser";
-import { absoluteUrl } from "@/lib/site";
+import { buildMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
   const t = getDictionary(locale);
-  return {
-    title: t.menu.title,
-    description: t.menu.subtitle,
-    alternates: { canonical: "/menu" },
-    openGraph: { title: t.menu.title, description: t.menu.subtitle, url: absoluteUrl("/menu") },
-  };
+  return buildMetadata({ title: t.menu.title, description: t.menu.subtitle, path: "/menu", locale });
 }
 
 export default async function MenuPage() {

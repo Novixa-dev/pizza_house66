@@ -3,7 +3,9 @@ import { getLocale, pick } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getRestaurant, restaurantStatus } from "@/server/restaurant";
 import { formatOpeningHours } from "@/lib/hours-display";
-import { telLink, whatsappLink } from "@/lib/site";
+import { absoluteUrl, telLink, whatsappLink } from "@/lib/site";
+import { shortPlusCode } from "@/lib/plus-code";
+import { LocationActions } from "@/components/location-actions";
 import { buildMetadata } from "@/lib/seo";
 import { Badge, Card, SectionHeading } from "@/components/ui";
 import { InstagramIcon, PhoneIcon, PinIcon, WhatsappIcon } from "@/components/ui/icons";
@@ -30,6 +32,15 @@ export default async function ContactPage() {
   const address = pick(locale, restaurant.addressAr, restaurant.addressEn);
   const tel = telLink(restaurant.phone);
   const whatsapp = whatsappLink(restaurant.whatsapp);
+
+  // Directions go to the pin itself, not to a text search for the name: a
+  // search lands on whichever "Pizza House" Maps ranks first, and the
+  // restaurant has said it has no connection to the others.
+  const hasPin = restaurant.latitude != null && restaurant.longitude != null;
+  const directionsUrl = hasPin
+    ? `https://www.google.com/maps/dir/?api=1&destination=${restaurant.latitude},${restaurant.longitude}`
+    : null;
+  const plusCode = hasPin ? shortPlusCode(restaurant.latitude!, restaurant.longitude!) : null;
 
   // Each way of reaching the restaurant is a tap target of its own rather
   // than a line of text with a number in it: on a phone, "call us" that does
@@ -103,6 +114,28 @@ export default async function ContactPage() {
           </li>
         ))}
       </ul>
+
+      {address ? (
+        <Card className="mt-8 p-6">
+          <h2 className="mb-1 font-bold text-ink">{t.pages.contactFindUs}</h2>
+          <p className="mb-5 text-sm text-ink-soft">{address}</p>
+          <LocationActions
+            directionsUrl={directionsUrl}
+            address={address}
+            plusCode={plusCode}
+            shareUrl={restaurant.mapUrl ?? absoluteUrl("/contact")}
+            shareTitle={pick(locale, restaurant.nameAr, restaurant.name)}
+            labels={{
+              directions: t.pages.contactDirections,
+              copyAddress: t.pages.contactCopyAddress,
+              copyCode: t.pages.contactCopyCode,
+              copied: t.pages.contactCopied,
+              share: t.pages.contactShare,
+              plusCode: t.pages.contactPlusCode,
+            }}
+          />
+        </Card>
+      ) : null}
 
       <Card className="mt-8 p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
