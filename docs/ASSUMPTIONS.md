@@ -39,6 +39,9 @@ assumed to be a known gap.
 | Currency subunit | YER, treated as having no practical subunit | `Restaurant.currency` → **Settings** | Confirm |
 | Timezone | `Asia/Aden` (UTC+3, no DST) | `Restaurant.timezone` → **Settings** | Confirm — the whole schedule is evaluated in it |
 | Map pin | **Done** — the restaurant's own Google Maps listing, coordinates 14.4891696, 49.0444845 | `Restaurant.mapUrl`, `latitude`, `longitude` → **Settings** | No |
+| Extra phone numbers | **Not used.** The prototype lists two more (YOU 738227788, Sabafon 711227788); neither Google Maps nor Instagram does | `Restaurant` has one phone and one WhatsApp field | **Yes** — a wrong number on the contact page costs an order. If real, they need a place to live in **Settings** |
+| Dining-room facts | **Not shown.** The prototype claims a family section, a youth hall, outdoor seating and a pickup corner | — | **Yes** — say what is true and the About page can carry it |
+| Plus Code | `F2QV+MQ`, computed from the pin (the prototype prints `F2QV+HPW`, about 30 m away) | `src/lib/plus-code.ts` | Check it resolves to the door in Google Maps |
 | Email | None set; the restaurant may not use one | `Restaurant.email` → **Settings** | Confirm |
 | Facebook | None set | `Restaurant.facebookUrl` → **Settings** | Confirm whether one exists |
 | Public holidays | None entered | **Hours → Overrides** | **Yes** — Eid in particular |

@@ -4,11 +4,11 @@ Three suites, each answering a different question.
 
 | Suite | Question | Tests | Command |
 |---|---|---|---|
-| Unit | Are the rules correct? | 250 | `npm test` |
+| Unit | Are the rules correct? | 259 | `npm test` |
 | Integration | Does the database agree? | 71 | `npm run test:integration` |
-| End-to-end | Does a person get through it? | 160 (80 × two projects) | `npm run test:e2e` |
+| End-to-end | Does a person get through it? | 190 (95 × two projects) | `npm run test:e2e` |
 
-All green — 159 of the 160 end-to-end runs pass and one is skipped by design
+All green — 189 of the 190 end-to-end runs pass and one is skipped by design
 (a phone-only test, on the desktop project) — along with `npm run lint`,
 `npm run typecheck` and `npm run build`. `npm run verify` chains the first
 four. The counts are read from the runs, not carried over; if you add a test,
@@ -16,7 +16,7 @@ re-read them rather than adding one.
 
 ---
 
-## Unit — `tests/unit/` (250)
+## Unit — `tests/unit/` (259)
 
 Everything in `src/lib` is pure and takes the clock as a parameter, which is
 exactly what makes the rules that most need to be *right* testable to the
@@ -68,6 +68,13 @@ any order, no word spanning two fields, absent fields never searched as the
 word "null"). Checked by breaking fifteen rules one at a time; each break
 failed a test. `src/lib/search.ts` serves both the customer menu and the
 staff product list.
+
+**`plus-code.test.ts` (5)** — the Plus Code encoder against the
+specification's own test vectors (a code a few metres off still looks right,
+so these are exact strings), the restaurant's pin (`F2QV+MQ`), the map's
+edges, and the alphabet. **`photo-hosts.test.ts` (4)** — the allowlist for
+photographs the server fetches to draw a share card: the two hosts, look-alike
+hosts, plain http, private addresses, credentials in the URL.
 
 **`funnel.test.ts` (13)** — the conversion funnel's fold: monotonic for any
 input, counts a session once however often it repeats a step, tolerates lost
@@ -143,9 +150,9 @@ data and its slot capacity, so parallel files would fight over it.
 
 ---
 
-## End-to-end — `tests/e2e/` (160)
+## End-to-end — `tests/e2e/` (190)
 
-Playwright, against a **real production build** with a real database. 80 test
+Playwright, against a **real production build** with a real database. 95 test
 definitions run in two projects: `mobile-ar` (Pixel 7, `ar-YE`, RTL) and
 `desktop-en` (Desktop Chrome, `en-GB`, LTR). Arabic on a phone is the primary
 way this restaurant's customers will actually use the site, so it is the
@@ -178,6 +185,21 @@ size: search narrows it and finds a product however its Arabic was typed, a
 search with no match offers a way back, the availability counts add up to the
 whole menu, searching from inside a filter keeps the filter, and the active
 filter is marked with `aria-current`.
+
+**`brand-and-seo.spec.ts` (8)** — what a link preview, a search engine and a
+home-screen install receive: the site card and the Twitter card are real
+1200×630 PNGs; a product link carries *its own* card, and a hidden or unknown
+one gets the site card rather than an error; nine pages share the card (every
+page built with `buildMetadata` once lost it); the tab icon and the 180px iOS
+icon are PNGs; the manifest's icons resolve at the sizes it claims; the sitemap
+lists the public pages and none of the private ones.
+
+**`contact-and-install.spec.ts` (7)** — directions go to the pin, not a name
+search; the Plus Code is the one computed from those coordinates; copy puts it
+on the real clipboard and says so; share falls back to copying where there is
+no share sheet; the install button is absent where the browser cannot install,
+appears on `beforeinstallprompt` and raises the dialog, shows the two taps on
+iPhone Safari, and stays away on Chrome for iOS.
 
 **`restaurant-info.spec.ts` (4)** — who and where: the "only branch" notice
 on `/contact` and `/about`, the orders-and-reservations line, and the
@@ -436,5 +458,5 @@ After the fix the spec ran 140 times (14 repeats × 10 tests) without a failure:
    they take, not for every branch.
 
 Three suites exist so each can stay fast. Pushing a rule down into the unit
-layer is almost always the right move: all 250 unit tests run in a few
+layer is almost always the right move: all 259 unit tests run in a few
 seconds, with no database and no server.

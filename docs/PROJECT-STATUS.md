@@ -105,8 +105,8 @@ illustrative ones. The seeded staff accounts still use the deployment's
 
 | Item | Status |
 |---|---|
-| Unit + integration tests (321) | ✅ 250 unit + 71 integration |
-| E2E tests (160 = 80 × two viewports/languages) | ✅ 159 pass; one skipped by design — a phone-only test on the desktop project |
+| Unit + integration tests (330) | ✅ 259 unit + 71 integration |
+| E2E tests (190 = 95 × two viewports/languages) | ✅ 189 pass; one skipped by design — a phone-only test on the desktop project |
 | Lint, typecheck, build | ✅ clean |
 | CI pipeline | ✅ `.github/workflows/ci.yml` — four jobs, green on the working branch's pushed head (read from GitHub). Its first real runs found two faults that were invisible locally; both fixed, see `docs/TESTING.md` |
 | Accessibility | ✅ axe-core WCAG 2.1 A/AA in CI, light and dark, plus no-horizontal-overflow at phone width |

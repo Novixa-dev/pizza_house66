@@ -41,7 +41,7 @@ Next.js 16 (App Router, TypeScript)
 `order-state.ts` and `permissions.ts` contain no I/O and take the clock as a
 parameter. That is what makes the rules that most need to be *correct* —
 which pickup slots exist, what an order costs, who may cancel it — testable
-to the minute without a database or a running server. 250 unit tests live
+to the minute without a database or a running server. 259 unit tests live
 against this layer (see `docs/TESTING.md`).
 
 **`src/server` touches the world.** It loads rows, opens transactions, writes

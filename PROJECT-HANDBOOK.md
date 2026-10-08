@@ -81,8 +81,8 @@ Source of the idea: `docs/PROJECT_ORIGIN.md`. Full requirements: `docs/PRD.md`.
 | Languages | Arabic (default, RTL) and English (LTR) |
 | Currency | YER, integer minor units |
 | Timezone | `Asia/Aden` (UTC+3, no DST) — stored as data, not hardcoded |
-| Application code | ~19,700 lines across 125 TypeScript/TSX files in `src/` |
-| Tests | 250 unit · 71 integration · 160 end-to-end (80 × two projects; one skipped by design) |
+| Application code | ~20,600 lines across 135 TypeScript/TSX files in `src/` |
+| Tests | 259 unit · 71 integration · 190 end-to-end (95 × two projects; one skipped by design) |
 | Documentation | 31 files in `docs/`, plus this handbook |
 
 This is also the reference implementation for **Novixa Restaurant**, a

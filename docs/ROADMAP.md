@@ -37,7 +37,7 @@ The full product, not a demo of one:
 - Nonce-based CSP and the hardening header set
 - First-party analytics and the conversion funnel
 - SEO: structured data, sitemap, robots, Open Graph, PWA manifest
-- 250 unit / 71 integration / 160 end-to-end tests (two projects × 80), and a
+- 259 unit / 71 integration / 190 end-to-end tests (two projects × 95), and a
   four-job CI pipeline that is green on the working branch
 
 ## Phase 3 — Production hardening: partially done
