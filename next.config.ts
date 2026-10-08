@@ -5,14 +5,39 @@ const nextConfig: NextConfig = {
   // restaurant's ordering system is not the place to discover one at
   // runtime. (Next.js 16 removed the `eslint` config key along with
   // `next lint`; linting runs as its own npm script instead.)
-  typescript: { ignoreBuildErrors: false },
+  // Errors are never ignored. `tsconfigPath` points the build's type check at
+  // the app, not at the test suite — see the comment in tsconfig.build.json.
+  typescript: { ignoreBuildErrors: false, tsconfigPath: "tsconfig.build.json" },
+
+  // The social-card renderer reads these at request time, which the file
+  // tracer cannot see. Without them a deployment that ships only the traced
+  // files answers every link preview and app icon with an error.
+  outputFileTracingIncludes: {
+    "/**": ["./src/assets/fonts/**", "./public/brand/logo.svg"],
+  },
 
   images: {
-    // Menu art ships with the app, so there is no remote image host to allow.
-    // Adding one later means adding it here explicitly — a deliberate step,
-    // not an accidental open door.
-    remotePatterns: [],
+    // Two hosts, both named explicitly. A wildcard here would let any URL a
+    // staff member pastes into the admin become an image this server fetches
+    // and re-serves, which is a proxy with the restaurant's name on it.
+    //
+    // The menu photographs live on these rather than in the repository: the
+    // bytes do not belong in git, and Next's optimizer fetches, resizes and
+    // re-encodes them to AVIF or WebP at the size each device asks for, so
+    // the customer gets a smaller file than a committed JPEG would be.
+    //
+    // Both licences permit this use — Unsplash's own licence, and Creative
+    // Commons for Wikimedia. docs/ASSUMPTIONS.md records that these are
+    // stand-ins for the restaurant's own photographs, which the owner can
+    // upload over any of them from Admin → Products → Dish photo.
+    remotePatterns: [
+      { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },
+      { protocol: "https", hostname: "upload.wikimedia.org", pathname: "/**" },
+    ],
     formats: ["image/avif", "image/webp"],
+    // A menu photograph is replaced when the owner uploads their own, not on
+    // a schedule, so a long cache costs nothing and saves a round trip.
+    minimumCacheTTL: 60 * 60 * 24 * 7,
   },
 
   async redirects() {
@@ -22,6 +47,12 @@ const nextConfig: NextConfig = {
       // working, and a dead link is how a customer decides the order is lost.
       { source: "/track", destination: "/orders", permanent: true },
       { source: "/my-orders", destination: "/orders", permanent: true },
+      // Browsers ask for /favicon.ico whatever the page declares, and the file
+      // that used to answer was Next's own scaffold logo. The brand icon is
+      // generated at /icon; pointing the old path there keeps those requests
+      // from ending in a 404 in the logs. Temporary, because the icon URL is
+      // ours to change.
+      { source: "/favicon.ico", destination: "/icon", permanent: false },
     ];
   },
 

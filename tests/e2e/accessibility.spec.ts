@@ -2,6 +2,20 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { signInAs } from "./auth-helper";
 
+/**
+ * Opens the margherita product page.
+ *
+ * By slug, not by display name. Matching the rendered name coupled every one
+ * of these tests to one transliteration of "Margherita": the catalogue was
+ * updated to the restaurant's own Arabic spelling — مارجريتا with a ج, not a
+ * غ — and five tests failed on a menu edit that broke nothing. A slug is the
+ * stable identifier, and it is the same in both languages.
+ */
+async function openMargherita(page: Page) {
+  await page.goto("/menu");
+  await page.locator('a[href="/product/margherita"]').first().click();
+  await expect(page).toHaveURL(/\/product\/margherita/);
+}
 // Automated accessibility checks (docs/PRD.md §50).
 //
 // `docs/DESIGN-SYSTEM.md` commits to specific things — AA contrast in both
@@ -61,9 +75,10 @@ test.describe("accessibility — customer site", () => {
     // Scanned with a populated cart: an empty cart renders an empty state,
     // so scanning it would pass without ever looking at the form — the one
     // screen on the customer path with the most inputs to get wrong.
-    await page.goto("/menu");
-    await page.getByRole("link", { name: /margherita|مارغريتا/i }).first().click();
-    await page.getByRole("button", { name: /add to cart|أضف إلى السلة/i }).click();
+    await openMargherita(page);
+    await page
+      .getByRole("button", { name: /add to cart|أضف إلى السلة/i })
+      .click();
     await expect(page).toHaveURL(/\/cart/);
 
     await page.goto("/checkout");
@@ -76,6 +91,22 @@ test.describe("accessibility — staff screens", () => {
   test("the admin dashboard has no WCAG A/AA violations", async ({ page }) => {
     await signInAs(page, "owner@pizzahouse.local");
     await page.goto("/admin");
+    await page.waitForLoadState("networkidle");
+    await expectNoViolations(page);
+  });
+
+  test("the admin product list has no WCAG A/AA violations", async ({ page }) => {
+    await signInAs(page, "owner@pizzahouse.local");
+    await page.goto("/admin/products");
+    await page.waitForLoadState("networkidle");
+    await expectNoViolations(page);
+  });
+
+  test("the admin product list has no violations with a filter applied", async ({ page }) => {
+    // The filtered state renders differently — chips marked current, a clear
+    // link — and is the one a manager actually sits in.
+    await signInAs(page, "owner@pizzahouse.local");
+    await page.goto("/admin/products?status=AVAILABLE&q=a");
     await page.waitForLoadState("networkidle");
     await expectNoViolations(page);
   });
@@ -100,14 +131,18 @@ test.describe("accessibility — dark mode", () => {
     ["/menu", "menu"],
     ["/product/margherita", "product"],
   ] as const) {
-    test(`${label} page has no WCAG A/AA violations in dark mode`, async ({ page }) => {
+    test(`${label} page has no WCAG A/AA violations in dark mode`, async ({
+      page,
+    }) => {
       await page.goto(path);
       await page.waitForLoadState("networkidle");
       await expectNoViolations(page);
     });
   }
 
-  test("the admin dashboard has no WCAG A/AA violations in dark mode", async ({ page }) => {
+  test("the admin dashboard has no WCAG A/AA violations in dark mode", async ({
+    page,
+  }) => {
     await signInAs(page, "owner@pizzahouse.local");
     await page.goto("/admin");
     await page.waitForLoadState("networkidle");
@@ -134,7 +169,7 @@ test.describe("layout — no horizontal overflow at phone width", () => {
     }));
     expect(
       scrollWidth,
-      `${label}: ${scrollWidth}px of content in a ${clientWidth}px viewport`
+      `${label}: ${scrollWidth}px of content in a ${clientWidth}px viewport`,
     ).toBeLessThanOrEqual(clientWidth + 1);
   }
 
@@ -150,10 +185,13 @@ test.describe("layout — no horizontal overflow at phone width", () => {
     });
   }
 
-  test("cart and checkout do not scroll sideways with items in the basket", async ({ page }) => {
-    await page.goto("/menu");
-    await page.getByRole("link", { name: /margherita|مارغريتا/i }).first().click();
-    await page.getByRole("button", { name: /add to cart|أضف إلى السلة/i }).click();
+  test("cart and checkout do not scroll sideways with items in the basket", async ({
+    page,
+  }) => {
+    await openMargherita(page);
+    await page
+      .getByRole("button", { name: /add to cart|أضف إلى السلة/i })
+      .click();
     await expect(page).toHaveURL(/\/cart/);
     await page.waitForLoadState("networkidle");
     await expectNoHorizontalOverflow(page, "cart");
@@ -164,14 +202,23 @@ test.describe("layout — no horizontal overflow at phone width", () => {
 
     // The slot grid is the part that actually broke, and it only renders
     // once "schedule for later" is chosen.
-    await page.getByRole("radio", { name: /schedule for later|تحديد وقت لاحق/i }).check();
-    await expect(page.getByTestId("pickup-slots").getByRole("button").first()).toBeVisible();
-    await expectNoHorizontalOverflow(page, "checkout with the slot picker open");
+    await page
+      .getByRole("radio", { name: /schedule for later|تحديد وقت لاحق/i })
+      .check();
+    await expect(
+      page.getByTestId("pickup-slots").getByRole("button").first(),
+    ).toBeVisible();
+    await expectNoHorizontalOverflow(
+      page,
+      "checkout with the slot picker open",
+    );
   });
 
   for (const [path, label, email] of [
     ["/admin", "admin dashboard", "owner@pizzahouse.local"],
     ["/admin/orders", "admin orders", "owner@pizzahouse.local"],
+    // The real menu is ~184 products, so this is the longest staff page.
+    ["/admin/products", "admin products", "owner@pizzahouse.local"],
     ["/kitchen", "kitchen display", "kitchen@pizzahouse.local"],
   ] as const) {
     test(`${label} does not scroll sideways`, async ({ page }) => {
@@ -197,20 +244,23 @@ test.describe("accessibility — the commitments in docs/DESIGN-SYSTEM.md", () =
     expect(dir).toBe(lang === "ar" ? "rtl" : "ltr");
   });
 
-  test("every checkout field is programmatically labelled", async ({ page }) => {
+  test("every checkout field is programmatically labelled", async ({
+    page,
+  }) => {
     // Checkout renders an empty state rather than a form when the cart is
     // empty — correct behaviour, and it means the form only exists to be
     // scanned once something is in the cart.
-    await page.goto("/menu");
-    await page.getByRole("link", { name: /margherita|مارغريتا/i }).first().click();
-    await page.getByRole("button", { name: /add to cart|أضف إلى السلة/i }).click();
+    await openMargherita(page);
+    await page
+      .getByRole("button", { name: /add to cart|أضف إلى السلة/i })
+      .click();
     await expect(page).toHaveURL(/\/cart/);
 
     await page.goto("/checkout");
     await page.waitForLoadState("networkidle");
 
     const fields = page.locator(
-      "input:not([type=hidden]):not([type=radio]):not([type=checkbox]), select, textarea"
+      "input:not([type=hidden]):not([type=radio]):not([type=checkbox]), select, textarea",
     );
     const count = await fields.count();
     expect(count, "checkout should render form fields").toBeGreaterThan(0);
@@ -227,12 +277,14 @@ test.describe("accessibility — the commitments in docs/DESIGN-SYSTEM.md", () =
         : false;
       expect(
         hasLabelElement || Boolean(ariaLabel) || Boolean(ariaLabelledBy),
-        `field #${i} (id=${id ?? "none"}) has no label, aria-label or aria-labelledby`
+        `field #${i} (id=${id ?? "none"}) has no label, aria-label or aria-labelledby`,
       ).toBe(true);
     }
   });
 
-  test("the focus indicator stays visible on a brand-coloured surface", async ({ page }) => {
+  test("the focus indicator stays visible on a brand-coloured surface", async ({
+    page,
+  }) => {
     // The skip link is the first Tab stop on every page and sits on
     // `bg-brand`. A single-colour ring in the brand colour measured exactly
     // 1.00:1 there — invisible, on the one control that exists purely for
@@ -254,12 +306,68 @@ test.describe("accessibility — the commitments in docs/DESIGN-SYSTEM.md", () =
     });
 
     expect(focus, "Tab should focus something").not.toBeNull();
-    expect(focus!.isSkipLink, "the first Tab stop should be the skip link").toBe(true);
+    expect(
+      focus!.isSkipLink,
+      "the first Tab stop should be the skip link",
+    ).toBe(true);
     expect(focus!.outlineStyle).not.toBe("none");
     expect(focus!.outlineWidth).toBeGreaterThan(0);
     // The halo: a spread-only shadow drawn around the element.
     expect(focus!.boxShadow, "the focus halo must be present").not.toBe("none");
   });
+
+  // Every keyboard stop on the pages added for order recall and coupons, not
+  // just the first one.
+  //
+  // This exists because an automated scanner reported "focus indicators
+  // missing across 2 component types" on this site and was wrong. Scanners
+  // move focus with a programmatic `.focus()`, which `:focus-visible`
+  // deliberately does not match — so a site whose keyboard focus styling is
+  // correct reads as having none. Pressing Tab is the only way to tell the
+  // difference, and the difference matters: acting on that report would have
+  // meant replacing `:focus-visible` with `:focus`, putting a ring on every
+  // mouse click on every button.
+  for (const path of ["/orders", "/offers", "/menu", "/contact"]) {
+    test(`every keyboard stop on ${path} has a visible focus ring`, async ({
+      page,
+    }) => {
+      await page.goto(path);
+
+      const unringed: string[] = [];
+      let stops = 0;
+
+      for (let i = 0; i < 30; i += 1) {
+        await page.keyboard.press("Tab");
+        const info = await page.evaluate(() => {
+          const el = document.activeElement;
+          if (!el || el === document.body) return null;
+          const cs = getComputedStyle(el);
+          return {
+            label: `${el.tagName.toLowerCase()}${el.getAttribute("type") ? `[${el.getAttribute("type")}]` : ""}`,
+            outlineWidth: parseFloat(cs.outlineWidth),
+            outlineStyle: cs.outlineStyle,
+            boxShadow: cs.boxShadow,
+          };
+        });
+        if (!info) continue;
+        stops += 1;
+
+        const ringed =
+          (info.outlineStyle !== "none" && info.outlineWidth >= 2) ||
+          (info.boxShadow !== "none" && info.boxShadow !== "");
+        if (!ringed) unringed.push(info.label);
+      }
+
+      expect(
+        stops,
+        `${path} should have keyboard stops to check`,
+      ).toBeGreaterThan(5);
+      expect(
+        unringed,
+        `elements with no visible focus ring on ${path}`,
+      ).toEqual([]);
+    });
+  }
 
   test("keyboard focus is visible, not suppressed", async ({ page }) => {
     await page.goto("/");
@@ -296,7 +404,22 @@ test.describe("touch targets — WCAG 2.2 SC 2.5.8", () => {
   // The skip link is the one exception: it is 1x1 until focused, which is
   // how a visually-hidden-until-focused control is supposed to behave.
 
-  const PAGES = ["/", "/menu", "/product/margherita"];
+  // Every page a customer can reach, not a sample. Adding a page without
+  // adding it here is how the footer's 20px phone link survived the first
+  // scan: the pages that were checked were fine.
+  const PAGES = [
+    "/",
+    "/menu",
+    "/product/margherita",
+    "/offers",
+    "/orders",
+    "/contact",
+    "/about",
+    "/faq",
+    "/terms",
+    "/privacy",
+    "/credits",
+  ];
 
   for (const path of PAGES) {
     test(`every target on ${path} is at least 24px`, async ({ page }) => {
@@ -305,7 +428,9 @@ test.describe("touch targets — WCAG 2.2 SC 2.5.8", () => {
 
       const small = await page.evaluate(() => {
         const out: { text: string; w: number; h: number }[] = [];
-        const nodes = document.querySelectorAll("a, button, input, select, [role=button]");
+        const nodes = document.querySelectorAll(
+          "a, button, input, select, [role=button]",
+        );
         for (const el of Array.from(nodes)) {
           if (el.closest(".sr-only-focusable")) continue;
           const rect = el.getBoundingClientRect();
@@ -313,7 +438,9 @@ test.describe("touch targets — WCAG 2.2 SC 2.5.8", () => {
           if (getComputedStyle(el).display === "none") continue;
           if (rect.width >= 24 && rect.height >= 24) continue;
           out.push({
-            text: (el.textContent || el.getAttribute("aria-label") || "").trim().slice(0, 40),
+            text: (el.textContent || el.getAttribute("aria-label") || "")
+              .trim()
+              .slice(0, 40),
             w: Math.round(rect.width),
             h: Math.round(rect.height),
           });
@@ -323,7 +450,7 @@ test.describe("touch targets — WCAG 2.2 SC 2.5.8", () => {
 
       expect(
         small,
-        `targets under 24px: ${small.map((s) => `"${s.text}" ${s.w}x${s.h}`).join(", ")}`
+        `targets under 24px: ${small.map((s) => `"${s.text}" ${s.w}x${s.h}`).join(", ")}`,
       ).toEqual([]);
     });
   }

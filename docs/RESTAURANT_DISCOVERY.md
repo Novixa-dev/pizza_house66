@@ -1,52 +1,47 @@
-# Restaurant Discovery — Pizza House (Al Mukalla, Yemen)
+# Restaurant Discovery — Pizza House 66 (Al Mukalla, Yemen)
 
-Status: **partial**. Direct access to Instagram (`instagram.com`) and several
-third-party listing sites was blocked by the build environment's network
-policy, so this discovery pass relied on web search snippets rather than a
-full visit to the profile. Everything below is labeled by confidence.
+Status: **substantially verified, with two open items.** The first version of
+this file was written when Instagram and the web were unreachable, and said
+almost nothing was known. That is no longer true. The full account — sources,
+what each one could and could not give, and what changed — is in
+[`FIELD-RESEARCH-2026-10.md`](FIELD-RESEARCH-2026-10.md). This file keeps the
+summary.
 
-## Verified
+## Verified (the restaurant's own Google Maps listing and Instagram)
 
-- The restaurant is real and operates as **Pizza House** / **بيتزا هاوس**.
-- Instagram: [`@pizza_house66`](https://www.instagram.com/pizza_house66/),
-  reported at roughly 64K followers, Arabic display name "بيتزا هاوس", bio
-  indicates it makes pizza and pastries and lists contact numbers for orders.
-- Located in **Al Mukalla, Yemen**, specifically the **Fawah** district,
-  matching the PRD's own SEO examples ("Pizza House Mukalla", "بيتزا في
-  المكلا").
+- Name **بيتزا هاوس / Pizza House 66**, a pizza restaurant, rated 4.3 on
+  Google Maps.
+- Address: حي المساكن، فوة، المكلا. Coordinates **14.4891696, 49.0444845**,
+  Plus Code `F2QV+MQ`.
+- Phone `05375561` and WhatsApp `772207788` — both in the Instagram bio, which
+  labels them "for orders and reservations".
+- Instagram `@pizza_house66`: about 67,000 followers, 117 posts.
+- Two daily sessions, morning and evening, with Friday evening only.
+- It has publicly stated that this is its **first and only branch** and that
+  it is unconnected to any other business using the name.
 
-## Not verified — OWNER INPUT REQUIRED
+## Open
 
-Everything below is an **ASSUMPTION** used only to make the demo/seed data
-realistic. None of it should be treated as fact, quoted to the owner, or
-shipped to production without confirmation:
+1. **The menu.** The 16 items on the site came from an early prototype. The
+   restaurant's own listing on a delivery app shows roughly 184 items,
+   including about 41 pizzas with local flavours and a "House" size tier,
+   about 40 drinks and 12 add-ons — and the prices differ from ours in both
+   directions. The owner has to supply the real menu.
+2. **Closing time.** Google Maps says 11 PM; the prototype and this site say
+   11:30 PM. Only the current day's row was readable on Maps, so Friday could
+   not be confirmed either.
 
-- Exact street address / map location
-- Phone number and WhatsApp number
-- Opening hours (seed data assumes 16:00–00:00 daily, matching the PRD's
-  illustrative example — not a real schedule)
-- Full menu, product names, and prices (seed data uses common
-  pizza-restaurant offerings, not the restaurant's actual menu)
-- Existing payment methods actually accepted (seed enables Pay-at-Pickup and
-  Bank Transfer as plausible defaults for the Yemeni market; disables
-  Electronic Payment since no local gateway was confirmed)
-- Whether an existing POS or ordering process is in use
-- Staff roles and how many people would use the admin/kitchen views
-- Preparation time per product (seed assumes 20 minutes for pizza, matching
-  the PRD's own worked examples)
-- Delivery availability (assumed out of scope per PRD — pickup-first)
+## Not reachable from here
+
+Instagram and the prototype site are blocked from the build environment by
+network policy, and the scraping service does not support Instagram. What is
+quoted above from Instagram comes from search-result titles and descriptions,
+not from a visit to the profile.
 
 ## What this means for the build
 
-Every seeded price, hour, and contact detail in `prisma/seed.ts` is marked
-`ASSUMPTION` in comments. The product itself (data model, ordering flow,
-scheduling engine, admin/kitchen tools) does not depend on any of these
-being correct — only the demo content does. Swapping in real menu/contact
-data is a seed-data and content change, not an architecture change.
-
-## Recommended next step
-
-Before this goes anywhere near production: get the actual menu, prices,
-phone/WhatsApp numbers, real opening hours, and confirmed payment methods
-directly from the owner, and replace `prisma/seed.ts` (or better, enter them
-through the admin product/category/settings screens once built out).
+The product does not depend on any of this being right — only the content
+does, and all of it is data an owner can change from the admin panel. The one
+change that is a developer's job is getting ~184 menu items in without
+entering them by hand: a CSV importer, listed first in
+`FIELD-RESEARCH-2026-10.md` §6.

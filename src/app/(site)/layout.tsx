@@ -3,6 +3,7 @@ import { getRestaurant, restaurantStatus } from "@/server/restaurant";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { PageViewTracker } from "@/components/analytics-tracker";
+import { StickyOrderBar } from "@/components/sticky-order-bar";
 
 /**
  * Shell for every customer-facing page.
@@ -27,6 +28,7 @@ export default async function SiteLayout({ children }: LayoutProps<"/">) {
         {children}
       </main>
       <SiteFooter locale={locale} restaurant={restaurant} />
+      <StickyOrderBar locale={locale} currency={restaurant.currency} />
       <PageViewTracker />
     </>
   );

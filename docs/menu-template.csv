@@ -1,0 +1,4 @@
+category,slug,name_ar,name_en,price,description_ar,description_en,status,prep_minutes,featured
+(مثال) بيتزا,,(مثال) بيتزا مارجريتا,(Example) Margherita,4500,جبنة موزاريلا وصلصة طماطم,Mozzarella and tomato sauce,HIDDEN,20,false
+(مثال) بيتزا,,(مثال) بيتزا هاوس مارجريتا,(Example) House Margherita,5500,,,HIDDEN,25,false
+(مثال) مشروبات,,(مثال) لاتيه,(Example) Latte,3300,,,HIDDEN,5,false

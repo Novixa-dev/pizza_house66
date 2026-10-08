@@ -6,21 +6,29 @@ blocked on someone other than a developer.
 Legend: ✅ built and tested · ⚠️ built with a stated limit · ⬜ not built,
 deliberately · 🔑 blocked on the owner
 
-## Live deployment
+## Live deployment — 🔑 **currently down**
 
-A working deployment runs on Railway: the Next.js app and a PostgreSQL 16
-instance in one project, with the app referencing the database internally
-(`${{Postgres.DATABASE_URL}}`), so the credential is never copied anywhere.
+**The site is off.** Railway's trial expired on 2026-10-01 at 08:37 UTC: the
+container took a SIGTERM and every deployment moved to REMOVED, so the domain
+serves Railway's "the train has not arrived at the station" page. A redeploy
+answers `Your trial has expired`. The logs show a clean stop, not an error —
+nothing in this repository is broken, and no change here brings it back.
+`docs/DEPLOYMENT.md` has the diagnosis and the three ways forward; the first
+step in all three is a database dump, because that volume holds the only copy
+of the order history.
 
-On each deploy it runs `prisma migrate deploy`, then `db:seed` (a no-op once
-a restaurant exists, via `SEED_ONLY_IF_EMPTY=1`), then `next start` behind a
-health check on `/`. The seeded staff accounts use the deployment's
+The deployment it was: the Next.js app and a PostgreSQL 16 instance in one
+Railway project, the app referencing the database internally
+(`${{Postgres.DATABASE_URL}}`) so the credential is never copied anywhere. On
+each deploy it ran `prisma migrate deploy`, then `db:seed` (a no-op once a
+restaurant exists, via `SEED_ONLY_IF_EMPTY=1`), then `next start` behind a
+health check on `/`.
+
+It carries the restaurant's own menu, hours and contact details, not the
+illustrative ones. The seeded staff accounts still use the deployment's
 `SEED_STAFF_PASSWORD`; **replace them with real accounts via
-`npm run staff:create` before the restaurant uses this** — see
+`npm run staff:create` before the restaurant uses this** —
 `docs/HANDOVER.md` §4.
-
-This is a demonstration deployment carrying the illustrative menu from
-`docs/ASSUMPTIONS.md`, not a live restaurant's system.
 
 ---
 
@@ -38,9 +46,15 @@ This is a demonstration deployment carrying the illustrative menu from
 | Order tracking | ✅ | Capability token, live timeline, auto-refresh |
 | Arabic / English | ✅ | Full RTL, both languages complete |
 | PWA install | ✅ | Installable; deliberately not offline |
+| Find an order again | ✅ | `/orders` — kept in the browser for 30 days, recoverable by reference + phone |
+| Reorder from history | ✅ | Rebuilt from live rows at today's prices; an unavailable item is named, not dropped. Surfaced on the home page for a returning visitor |
+| Offers and coupons | ✅ | `/offers`, public offers plus a coupon issued on the 5th completed order |
+| Phone order bar | ✅ | Carries the basket count and total; hidden on cart, checkout and desktop |
+| About / contact / FAQ / legal | ✅ | Plus a staff sign-in link in the footer |
+| Photo credits | ✅ | `/credits` — six menu photographs are CC BY or BY-SA and require it |
 | Customer accounts | ⬜ | Guest checkout only — an account requirement loses orders |
 | Delivery | ⬜ | Pickup-only product (`PRD.md` §5.2) |
-| Reorder from history | ⬜ | Phase 4 |
+| Dietary filters | ⬜ | The label key exists; filtering by it does not — `docs/COMPETITIVE-ANALYSIS.md` ف-٢ |
 
 ## Staff admin
 
@@ -49,7 +63,7 @@ This is a demonstration deployment carrying the illustrative menu from
 | Dashboard | ✅ | Today's revenue, counts, live queue, upcoming pickups |
 | Orders list + detail | ✅ | Filters, transitions, cancellation |
 | Payment verification | ✅ | Queue, receipt viewing, verify/reject with reason |
-| Products CRUD | ✅ | Including option groups and values |
+| Products CRUD | ✅ | Including option groups and values. The list has name search, an availability filter with a count per state, and rows that wrap on a phone — built for the real menu's ~184 items. Search (here and on the customer's menu) forgives how Arabic is typed — ه for ة, ا for أ |
 | Categories CRUD | ✅ | |
 | Promotions CRUD | ✅ | Percentage/fixed, minimum, cap, window, usage limit, scoping |
 | Customers | ✅ | Order history by phone |
@@ -91,11 +105,10 @@ This is a demonstration deployment carrying the illustrative menu from
 
 | Item | Status |
 |---|---|
-| Unit tests (88) | ✅ |
-| Integration tests (24) | ✅ |
-| E2E tests (92, two viewports/languages) | ✅ |
+| Unit + integration tests (333) | ✅ 259 unit + 74 integration |
+| E2E tests (190 = 95 × two viewports/languages) | ✅ 189 pass; one skipped by design — a phone-only test on the desktop project |
 | Lint, typecheck, build | ✅ clean |
-| CI pipeline | ✅ `.github/workflows/ci.yml` |
+| CI pipeline | ✅ `.github/workflows/ci.yml` — four jobs, green on the working branch's pushed head (read from GitHub). Its first real runs found two faults that were invisible locally; both fixed, see `docs/TESTING.md` |
 | Accessibility | ✅ axe-core WCAG 2.1 A/AA in CI, light and dark, plus no-horizontal-overflow at phone width |
 | Visual regression | ⬜ |
 | Load testing | ⬜ |
@@ -108,6 +121,17 @@ database, API, security, testing, deployment, design system, localization,
 SEO, analytics, roles, order state machine, payment flow, QA checklist and
 handover.
 
+Four documents carry the state of the work rather than its design, and are
+the ones to read first on picking this up:
+
+| | |
+|---|---|
+| `docs/REPORT-2026-10.md` | Where it stands, what changed last, how to verify it, what is blocked |
+| `docs/REVIEW-2026-10.md` | The team-lead pass over the repository, with the evidence per finding |
+| `docs/IMPROVEMENTS.md` | The plan that review produced, and what is done against it |
+| `docs/COMPETITIVE-ANALYSIS.md` | Measured against the reference build and the sites worth copying |
+| `docs/TEST-GUIDE.md` | Ten manual scenarios, the staff accounts, and the expected result of each |
+
 ---
 
 ## 🔑 Blocked on the owner
@@ -115,29 +139,46 @@ handover.
 Nothing below is a development task. Each is information or a decision only
 Pizza House can supply.
 
+### Stopping the project right now
+
 | # | What is needed | Why it blocks |
 |---|---|---|
-| 1 | **Real menu, prices and descriptions** | Everything seeded is illustrative (`docs/ASSUMPTIONS.md`) |
-| 2 | **Real business hours** | Seeded as 16:00–00:00 daily |
-| 3 | **Real prep times per product** | The scheduling promise is only as good as these numbers |
-| 4 | **Real slot capacity** | How many orders the kitchen can actually cook per 15 minutes |
-| 5 | **Real contact details and address** | Phone, WhatsApp, address, map link, coordinates |
-| 6 | **Bank transfer details** | Bank name, account number, account holder |
-| 7 | **Food photography** | Current images are illustrations |
-| 8 | **Staff list and roles** | So real accounts replace the demo ones |
-| 9 | **A production database** | Any managed Postgres |
-| 10 | **A domain** | For canonical URLs and the Google Business Profile |
-| 11 | **A Vercel plan decision** | A private org-owned repo needs Pro; see `docs/DEPLOYMENT.md` |
+| 1 | **A Railway plan, or a move to another host** | The site is off. Nothing ships until this is decided — `docs/DEPLOYMENT.md` |
+| 2 | **A database dump, before anything else** | That volume is the only copy of the restaurant's order history, and it is attached to an expired trial |
+| 3 | **The restaurant's real menu** — ideally exported from its delivery-app dashboard | We carry 16 items; the restaurant has ~184. Orders for anything not on our menu cannot be taken — `docs/FIELD-RESEARCH-2026-10.md` |
 
-`docs/HANDOVER.md` walks through each of these in order.
+### Still needed, not blocking today
+
+| # | What is needed | Why it matters |
+|---|---|---|
+| 3a | **Closing time: 23:00 or 23:30?** | Google Maps says 11 PM, our hours say 11:30 PM |
+| 4 | **Real prep times per product** | The scheduling promise is only as good as these numbers |
+| 5 | **Real slot capacity** | How many orders the kitchen can actually cook per 15 minutes |
+| 6 | **Bank transfer details** | Bank name, account number, account holder |
+| 7 | **Staff list and roles** | So real accounts replace the seeded ones — a shared password is not an account |
+| 8 | **A domain** | For canonical URLs and the Google Business Profile |
+
+### Supplied already, and checked
+
+The address, phone, WhatsApp, Instagram and map pin — checked against the
+restaurant's own Google Maps listing and Instagram profile — and the two
+daily sessions. Food photographs cover 13 of 16 items; the three branded
+drinks keep a vector bottle because the stock photograph available for each
+was of a different product.
+
+**Not supplied, despite earlier notes saying so: the menu.** The 16 items come
+from an early prototype; the restaurant's own delivery-app listing shows
+roughly 184. See `docs/FIELD-RESEARCH-2026-10.md`.
+
+`docs/HANDOVER.md` walks through the outstanding items in order.
 
 ## What I would build next
 
 In the order I would do it:
 
-1. **Per-language URLs** (`app/[lang]/…`). The single highest-value
-   remaining change — it is what makes both languages indexable, and it is
-   additive (`docs/SEO.md`).
+1. **Per-language URLs** (`app/[lang]/…`). The highest-value structural
+   change — it is what makes both languages indexable, and it is additive
+   (`docs/SEO.md`).
 2. **WhatsApp order notifications.** The notification records already exist;
    only delivery is missing. In Yemen this is the channel customers actually
    read.

@@ -94,16 +94,25 @@ export function ProductCard({
   const shell =
     "flex h-full flex-col rounded-[var(--radius)] border border-line bg-surface p-3 shadow-[var(--shadow-sm)]";
 
+  // The slug on the card, in both states, so a test can assert on *this*
+  // product rather than on "the first thing that matches" — which is how the
+  // sold-out check kept passing against a menu where nothing was sold out.
+  const testId = `product-card-${product.slug}`;
+
   if (soldOut) {
     return (
-      <div className={shell} aria-label={`${name} — ${t.menu.soldOut}`}>
+      <div className={shell} data-testid={testId} aria-label={`${name} — ${t.menu.soldOut}`}>
         {body}
       </div>
     );
   }
 
   return (
-    <Link href={`/product/${product.slug}`} className={`${shell} card-interactive`}>
+    <Link
+      href={`/product/${product.slug}`}
+      data-testid={testId}
+      className={`${shell} card-interactive`}
+    >
       {body}
     </Link>
   );

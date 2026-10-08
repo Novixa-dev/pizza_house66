@@ -1,0 +1,14 @@
+{
+  // The configuration `next build` and `next typegen` type-check with, named
+  // by `typescript.tsconfigPath` in next.config.ts.
+  //
+  // It exists because `tsconfig.json` deliberately includes `tests/**` — the
+  // editor and `npm run typecheck` should check the suite — while `next build`
+  // type-checks whatever its tsconfig selects. On a host that prunes
+  // devDependencies there is no `vitest` and no `@playwright/test` to resolve,
+  // so the build failed on the test files rather than on anything it ships.
+  // Nothing is relaxed here: the same strict options apply to every file that
+  // actually reaches production.
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "tests", "vitest.config.mts", "playwright.config.ts"]
+}

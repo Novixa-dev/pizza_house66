@@ -295,3 +295,32 @@ export const CategoryIcon = ({ name, ...props }: Omit<IconProps, "name"> & { nam
       return <ListIcon {...props} />;
   }
 };
+
+export const CopyIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="9" y="9" width="11" height="11" rx="2" />
+    <path d="M5 15V6a2 2 0 0 1 2-2h8" />
+  </Icon>
+);
+
+export const ShareIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 3v12" />
+    <path d="M8 7l4-4 4 4" />
+    <path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" />
+  </Icon>
+);
+
+export const DownloadIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 4v11" />
+    <path d="M8 11l4 4 4-4" />
+    <path d="M5 19h14" />
+  </Icon>
+);
+
+export const NavigationIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 3l7 17-7-4-7 4 7-17z" />
+  </Icon>
+);

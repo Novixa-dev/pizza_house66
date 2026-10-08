@@ -3,7 +3,9 @@ import { getLocale, pick } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getRestaurant, restaurantStatus } from "@/server/restaurant";
 import { formatOpeningHours } from "@/lib/hours-display";
-import { telLink, whatsappLink } from "@/lib/site";
+import { absoluteUrl, telLink, whatsappLink } from "@/lib/site";
+import { shortPlusCode } from "@/lib/plus-code";
+import { LocationActions } from "@/components/location-actions";
 import { buildMetadata } from "@/lib/seo";
 import { Badge, Card, SectionHeading } from "@/components/ui";
 import { InstagramIcon, PhoneIcon, PinIcon, WhatsappIcon } from "@/components/ui/icons";
@@ -30,6 +32,15 @@ export default async function ContactPage() {
   const address = pick(locale, restaurant.addressAr, restaurant.addressEn);
   const tel = telLink(restaurant.phone);
   const whatsapp = whatsappLink(restaurant.whatsapp);
+
+  // Directions go to the pin itself, not to a text search for the name: a
+  // search lands on whichever "Pizza House" Maps ranks first, and the
+  // restaurant has said it has no connection to the others.
+  const hasPin = restaurant.latitude != null && restaurant.longitude != null;
+  const directionsUrl = hasPin
+    ? `https://www.google.com/maps/dir/?api=1&destination=${restaurant.latitude},${restaurant.longitude}`
+    : null;
+  const plusCode = hasPin ? shortPlusCode(restaurant.latitude!, restaurant.longitude!) : null;
 
   // Each way of reaching the restaurant is a tap target of its own rather
   // than a line of text with a number in it: on a phone, "call us" that does
@@ -77,6 +88,11 @@ export default async function ContactPage() {
     <div className="container-page max-w-4xl py-10">
       <SectionHeading level={1} title={t.pages.contactTitle} subtitle={t.pages.contactLead} />
 
+      {/* The restaurant's own Instagram bio reads "orders and reservations" next
+          to these two numbers, so the page says the same thing a visitor has
+          already been told there. */}
+      <p className="mb-4 text-sm font-semibold text-ink-soft">{t.pages.reservations}</p>
+
       <ul className="grid gap-3 sm:grid-cols-2">
         {channels.map((channel) => (
           <li key={channel.label}>
@@ -99,6 +115,28 @@ export default async function ContactPage() {
         ))}
       </ul>
 
+      {address ? (
+        <Card className="mt-8 p-6">
+          <h2 className="mb-1 font-bold text-ink">{t.pages.contactFindUs}</h2>
+          <p className="mb-5 text-sm text-ink-soft">{address}</p>
+          <LocationActions
+            directionsUrl={directionsUrl}
+            address={address}
+            plusCode={plusCode}
+            shareUrl={restaurant.mapUrl ?? absoluteUrl("/contact")}
+            shareTitle={pick(locale, restaurant.nameAr, restaurant.name)}
+            labels={{
+              directions: t.pages.contactDirections,
+              copyAddress: t.pages.contactCopyAddress,
+              copyCode: t.pages.contactCopyCode,
+              copied: t.pages.contactCopied,
+              share: t.pages.contactShare,
+              plusCode: t.pages.contactPlusCode,
+            }}
+          />
+        </Card>
+      ) : null}
+
       <Card className="mt-8 p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="font-bold text-ink">{t.pages.contactHours}</h2>
@@ -117,6 +155,16 @@ export default async function ContactPage() {
           ))}
         </dl>
       </Card>
+
+      {/* The restaurant has publicly posted that this is its only branch and
+          that it has no connection to others using the name. A different
+          business, "Pizza House Umm al-Hamam", has its own number and its own
+          menu — so a customer searching the name can land on the wrong one.
+          Saying it here, where they look for a phone number, is the cheapest
+          place to stop that. */}
+      <p className="mt-6 rounded-[var(--radius-sm)] bg-surface-muted px-4 py-3 text-sm text-ink-soft">
+        {t.pages.onlyBranch}
+      </p>
     </div>
   );
 }

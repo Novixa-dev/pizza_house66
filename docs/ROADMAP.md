@@ -8,12 +8,13 @@ the feature-by-feature table; this is the shape of the journey.
 Done: architecture, data model, roles, the full PRD and vision document
 (`docs/PROJECT_ORIGIN.md`, `docs/PRD.md`).
 
-Not done: **restaurant discovery**. Instagram and web access were blocked in
-the environment this was built in, so the real menu, prices, hours and
-contact details were never verifiable (`docs/RESTAURANT_DISCOVERY.md`).
-Everything in the seed is a placeholder, catalogued in
-`docs/ASSUMPTIONS.md`. This is the one phase that cannot be completed by a
-developer.
+Partly done: **restaurant discovery**. Contact details, address, map pin and
+the two daily sessions are now checked against the restaurant's own Google
+Maps listing and Instagram. The **menu is not**: it is 16 items from an early
+prototype against roughly 184 on the restaurant's own delivery-app listing,
+and one closing time conflicts (`docs/FIELD-RESEARCH-2026-10.md`,
+`docs/ASSUMPTIONS.md`). The menu is the one part that cannot be completed by
+a developer — the owner has to supply it.
 
 ## Phase 1–2 — Sales demo → MVP: **complete**
 
@@ -36,7 +37,8 @@ The full product, not a demo of one:
 - Nonce-based CSP and the hardening header set
 - First-party analytics and the conversion funnel
 - SEO: structured data, sitemap, robots, Open Graph, PWA manifest
-- 84 unit / 24 integration / 48 E2E tests, and a CI pipeline
+- 259 unit / 71 integration / 190 end-to-end tests (two projects × 95), and a
+  four-job CI pipeline that is green on the working branch
 
 ## Phase 3 — Production hardening: partially done
 

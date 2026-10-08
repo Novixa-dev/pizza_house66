@@ -121,7 +121,7 @@ Tailwind CSS v4
 **Includes** slot-capacity accounting · timezone-correct scheduling ·
 server-authoritative pricing · a 26-permission access matrix · bank-transfer
 verification with audited receipt access · a nonce-based CSP · first-party
-analytics · 156 automated tests across unit, integration and end-to-end
+analytics · 480+ automated tests across unit, integration and end-to-end
 
 ---
 

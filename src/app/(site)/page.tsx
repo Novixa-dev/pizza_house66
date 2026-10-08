@@ -20,6 +20,7 @@ import {
   WhatsappIcon,
 } from "@/components/ui/icons";
 import { ProductCard } from "@/components/product-card";
+import { ReturningCustomerPrompt } from "@/components/returning-customer-prompt";
 
 export const dynamic = "force-dynamic";
 
@@ -130,6 +131,10 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Renders nothing unless this browser remembers an order, so a
+          first-time visitor never sees it. */}
+      <ReturningCustomerPrompt locale={locale} />
 
       {/* ---------------------------------------------------------------- */}
       {/* Categories                                                        */}
@@ -390,7 +395,10 @@ function StructuredData({
           ? { "@type": "GeoCoordinates", latitude: restaurant.latitude, longitude: restaurant.longitude }
           : undefined,
       openingHours: toSchemaOpeningHours(restaurant.businessHours),
-      acceptsReservations: false,
+      // Deliberately unset. This used to say `false`, but the restaurant's own
+      // Instagram bio reads "for orders and reservations" — so false was a claim
+      // its owner contradicts. It is not `true` either: this site has no booking
+      // flow, and `true` invites Google to look for one.
       potentialAction: {
         "@type": "OrderAction",
         target: { "@type": "EntryPoint", urlTemplate: absoluteUrl("/menu") },

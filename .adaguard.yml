@@ -1,0 +1,11 @@
+# Where the accessibility scanner should look.
+#
+# Railway does not put the app's URL in its GitHub deployment events — the
+# event carries a dashboard link — so the scanner had nothing to open and
+# reported "can't reach your preview" on every pull request instead of
+# reporting on the site. Naming the production URL here fixes it for every
+# future PR without per-PR configuration.
+#
+# This is the live site, not a per-branch preview: Railway deploys one
+# environment for this project, so a PR has no URL of its own to scan.
+url: https://app-production-656a.up.railway.app

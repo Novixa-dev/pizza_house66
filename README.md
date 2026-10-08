@@ -134,11 +134,14 @@ and what it deliberately does not — is in `docs/TESTING.md`.
 
 Two things are placeholders, and both are the restaurant's to supply:
 
-1. **The menu, prices, hours and contact details are illustrative.** They were
-   never verified against the real Pizza House — see
-   `docs/RESTAURANT_DISCOVERY.md` for why, and `docs/ASSUMPTIONS.md` for the
-   complete list of what needs confirming. Every one of them is editable from
-   the admin panel; none is hardcoded.
+1. **The menu is a stand-in, and a small one.** Contact details, address,
+   map pin and the two daily sessions are checked against the restaurant's own
+   Google Maps listing and Instagram. The menu is not: the 16 items came from
+   an early prototype, while the restaurant's own listing on a delivery app
+   shows roughly **184** — see `docs/FIELD-RESEARCH-2026-10.md`. One hour is
+   also in conflict (Google says it closes at 23:00, the prototype 23:30), and
+   `docs/ASSUMPTIONS.md` has the full list. Every one of these is editable
+   from the admin panel; none is hardcoded.
 2. **The product images are illustrations, not photographs.** Real food
    photography has to come from the restaurant. Each illustration sits at
    exactly the path a real photo will replace.
@@ -176,7 +179,25 @@ system.
 - `docs/TESTING.md` — the three suites and the gaps
 - `docs/QA-CHECKLIST.md` — the manual pass before any release
 - `docs/ENVIRONMENT.md` — every variable
-- `docs/DEPLOYMENT.md` — deploying to Vercel or anywhere else
+- `docs/DEPLOY-VPS.md` — **your own server (Contabo VPS)**: one command to install, one to update, HTTPS and nightly backups included
+- `docs/DEPLOYMENT.md` — deploying to Vercel, Railway or anywhere else
+
+**Reviews, reports and how to test it**
+- `docs/TEST-GUIDE.md` — ten ordering scenarios, step by step, with the staff
+  accounts and the expected result of each
+- `docs/REPORT-2026-10.md` — the current state, what changed last, how to
+  verify it, and what is blocked on whom
+- `docs/REVIEW-2026-10.md` — the team-lead pass over the whole repository,
+  with the evidence for each finding
+- `docs/IMPROVEMENTS.md` — the plan that review produced, and what is done
+- `docs/COMPETITIVE-ANALYSIS.md` — measured against the reference build and
+  the ordering sites worth copying
+- `docs/AUDIT-2026-09.md` — the earlier audit of the live site
+- `docs/MENU-IMPORT.md` — load the restaurant's whole menu from a CSV
+  (`npm run menu:import`), with a dry run, no deletions and drafts by default
+- `docs/FIELD-RESEARCH-2026-10.md` — what the restaurant's own Google Maps,
+  Instagram and delivery-app listing say, what changed because of it, and the
+  open questions only the owner can answer
 
 **The source material**
 - `docs/PROJECT_ORIGIN.md` — the original vision document

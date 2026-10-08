@@ -186,6 +186,107 @@ CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
 Set `output: "standalone"` in `next.config.ts` first if you want a smaller
 image; the app does not otherwise care.
 
+> **الخادم الخاص (Contabo VPS):** الطريق الموصى به الآن هو
+> [`DEPLOY-VPS.md`](DEPLOY-VPS.md) — Docker Compose وCaddy وPostgres ونسخ
+> احتياطي، بأمر تثبيت واحد. باقي هذا الملف عن Railway وVercel.
+>
+> **تحذير يخصّ أي استضافة:** لا تشغّل `npm run db:seed` عند كل إقلاع. يكتب فوق
+> أسعار المنتجات وأسماءها، ويُخفي كل منتج وقسم لا يعرفه، فتعود أسعارك القديمة
+> بعد كل إعادة تشغيل ويختفي ما استوردتَه. الأمر الصحيح للإنتاج
+> `npm run db:bootstrap` (يهيّئ قاعدة فارغة مرة واحدة فقط).
+
+## GitHub Actions: it runs now
+
+**CI works.** Every pull request runs four jobs — typecheck/lint/unit tests, a
+production build with no devDependencies, the integration tests against a
+Postgres service, and the end-to-end suite against a production build — and
+the head of the working branch passes all four (run #68, checked on GitHub
+rather than assumed).
+
+It did not always. For the first 55 runs nothing in CI ran: each failed two to
+three seconds after being created, with no logs to fetch — the log endpoint
+returned 404 because there was no log, the runner never started. That was an
+account-level block on a **private** repository (exhausted Actions minutes, or
+Actions restricted for private repositories on the plan), not a failing test,
+and no change to a workflow file could have fixed it. It was lifted on the
+account side. **If runs start dying in two or three seconds again, it is that
+block, not the code.** The two ways out then:
+
+- **Make the repository public.** Actions is unmetered on public repositories.
+  Nothing secret is committed — every credential is an environment variable,
+  and the seed's staff password comes from `SEED_STAFF_PASSWORD`.
+- **Add Actions minutes** to the organization, under GitHub → the
+  organization → Settings → Billing.
+
+The first real runs found two faults that had been invisible locally (a typed
+route file only a previous build leaves behind, and test-only type packages the
+production build needed) — see `docs/TESTING.md`.
+
+The deploy gate below therefore *can* pass; what stops a deploy today is
+Railway, not CI (next section). Before any manual deploy — `workflow_dispatch`
+with `skip_ci_gate`, or `railway up` — run `npm run typecheck && npm run lint
+&& npm test && npm run test:integration`, which is what the `static` and
+`integration` jobs run.
+
+## The live site is down: the Railway trial expired
+
+**2026-10-01, 08:37 UTC.** Railway sent the container SIGTERM, stopped it, and
+moved every deployment of the `app` service to REMOVED. The domain now serves
+Railway's "the train has not arrived at the station" page, which is what it
+shows when a service has no active deployment.
+
+A redeploy returns:
+
+> Your trial has expired. Please select a plan to continue using Railway.
+
+That is the whole cause. It is not a build failure, a bad commit, or a crash —
+the logs show a clean SIGTERM, not an error. **No change to this repository
+brings the site back.** The code that was running was healthy; it was switched
+off for billing.
+
+Three ways forward, in order of least work:
+
+1. **Pick a Railway plan.** Hobby is a few dollars a month and the service
+   redeploys from the branch it already tracks. Nothing else changes, and the
+   Postgres volume with the orders in it is still there.
+2. **Move the app to another host.** It is a standard Next.js server app with
+   a `Dockerfile`-free Nixpacks build, so Vercel, Fly.io or Render all take it.
+   The database has to move too — Neon and Supabase both have a free Postgres —
+   and `DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET`, `SEED_STAFF_PASSWORD` and
+   `NEXT_PUBLIC_APP_URL` move with it. Budget an afternoon, mostly for the
+   database.
+3. **Export the data first either way.** The Postgres volume is attached to a
+   project on an expired trial. Before anything else, take a dump: that is the
+   restaurant's order history and it is the only copy.
+
+Whichever is chosen, the menu photographs are the one piece that needs the
+host to have outbound network access, since they are fetched from Unsplash and
+Wikimedia by the image optimizer. Every host above has it; this build container
+does not, which is why they cannot be verified from here.
+
+## What production currently tracks
+
+Railway's `app` service is wired to the repository with:
+
+```
+source.branch       claude/lucid-bohr-kmmyyp
+source.checkSuites  false
+```
+
+Two things follow, and both are worth knowing before the next change:
+
+1. **Production follows a feature branch, not `main`.** Every push to
+   `claude/lucid-bohr-kmmyyp` deploys straight to the live site. That is why
+   the site updated during development without anyone merging anything.
+2. **`checkSuites: false` means Railway does not wait for CI.** It would not
+   wait even if CI worked. A broken commit reaches customers as fast as a good
+   one.
+
+Once `main` is the default branch, point Railway at `main` (service →
+Settings → Source) and turn its automatic deploys off, leaving the workflow
+below as the only path to production. Until then, treat a push to that branch
+as a deploy, because it is one.
+
 ## Automatic deployment
 
 `.github/workflows/deploy.yml` ships `main` to Railway **after** CI has passed

@@ -1,12 +1,22 @@
 /**
  * Seeds a realistic, demonstrable Pizza House environment.
  *
- * IMPORTANT — the menu, prices, hours, bank details and contact information
- * below are ILLUSTRATIVE, not the real restaurant's. They exist so the system
- * can be demonstrated and tested end to end with data that behaves like real
- * data (docs/PRD.md §77 — no "Product 1 / Test User" placeholders). Every one
- * of them is listed in docs/ASSUMPTIONS.md and must be replaced with the
- * owner's real values before launch.
+ * What is real and what is not, because this file used to claim both
+ * extremes at once:
+ *
+ *   CHECKED against the restaurant's own Google Maps listing and Instagram:
+ *   name, address, phone, WhatsApp, map pin and coordinates, Instagram, and the
+ *   two daily sessions.
+ *
+ *   NOT CHECKED, and known to be incomplete: the MENU. These 16 items came from
+ *   an early prototype; the restaurant's own listing on a delivery app shows
+ *   roughly 184. Prices differ from that listing in both directions. Closing
+ *   time is also in conflict (Google says 23:00, this file says 23:30).
+ *   docs/FIELD-RESEARCH-2026-10.md has the evidence.
+ *
+ * Demonstrable data is still the point (docs/PRD.md §77 — no "Product 1 / Test
+ * User" placeholders), but nobody should read the menu below as the
+ * restaurant's. Everything unconfirmed is listed in docs/ASSUMPTIONS.md.
  *
  * The seed is idempotent: it upserts by slug/email, so re-running it updates
  * the demo catalog in place rather than duplicating it.
@@ -130,7 +140,7 @@ const CATALOG: CategorySeed[] = [
           "مزيج متكامل من قطع اللحم والدجاج والببروني، مع الفلفل الرومي، البصل، الزيتون، والمشروم الطازج بجبنة الموزاريلا الغنية.",
         descriptionEn:
           "Beef, chicken and pepperoni with bell pepper, onion, olives and fresh mushrooms under rich mozzarella.",
-        imageUrl: "/menu/pizza-supreme.svg",
+        imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=1000&q=80",
         basePriceMinor: 5500,
         featured: true,
         badge: "bestseller",
@@ -145,7 +155,7 @@ const CATALOG: CategorySeed[] = [
           "قطع صدور دجاج مشوية بتتبيلتنا الخاصة، صوص الرانش الغني، فطر طازج، وجبنة موزاريلا تعلوها رشة أوريجانو عطرة.",
         descriptionEn:
           "Grilled chicken breast in our own marinade, rich ranch sauce, fresh mushrooms and mozzarella with oregano.",
-        imageUrl: "/menu/pizza-chicken-ranch.svg",
+        imageUrl: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=1000&q=80",
         basePriceMinor: 5000,
         featured: true,
         badge: "bestseller",
@@ -160,7 +170,7 @@ const CATALOG: CategorySeed[] = [
           "دجاج متبل بصلصة الباربكيو المدخنة اللذيذة مع شرائح البصل الأحمر وجبنة الموزاريلا وصوص البيتزا الذهبي.",
         descriptionEn:
           "Chicken in smoky barbecue sauce with red onion, mozzarella and our golden pizza sauce.",
-        imageUrl: "/menu/pizza-bbq-chicken.svg",
+        imageUrl: "https://images.unsplash.com/photo-1593560708920-61dd98c46a4e?w=1000&q=80",
         basePriceMinor: 4800,
         prepMinutes: 20,
         optionGroups: [pizzaSizes(1000, 2100), crustGroup, extrasGroup],
@@ -173,7 +183,7 @@ const CATALOG: CategorySeed[] = [
           "شرائح ببروني بقري فاخر مع جبنة موزاريلا ذائبة وصلصة الطماطم الإيطالية الخاصة ببيتزا هاوس على عجينة طازجة.",
         descriptionEn:
           "Prime beef pepperoni, melting mozzarella and our own Italian tomato sauce on fresh dough.",
-        imageUrl: "/menu/pizza-pepperoni.svg",
+        imageUrl: "https://images.unsplash.com/photo-1628840042765-356cda07504e?w=1000&q=80",
         basePriceMinor: 4500,
         featured: true,
         prepMinutes: 18,
@@ -187,7 +197,7 @@ const CATALOG: CategorySeed[] = [
           "تشكيلة غنية من الخضار الطازجة: فلفل حلو ملون، بصل مقرمش، طماطم، زيتون، مشروم، مع صلصة الطماطم وجبنة الموزاريلا.",
         descriptionEn:
           "Sweet peppers, crisp onion, tomato, olives and mushrooms with tomato sauce and mozzarella.",
-        imageUrl: "/menu/pizza-veggie.svg",
+        imageUrl: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=1000&q=80",
         basePriceMinor: 4000,
         prepMinutes: 18,
         optionGroups: [pizzaSizes(900, 1800), crustGroup, extrasGroup],
@@ -200,7 +210,7 @@ const CATALOG: CategorySeed[] = [
           "البساطة الإيطالية الفاخرة: صلصة طماطم متبلة بالأعشاب الطازجة، طبقة وفيرة من جبنة الموزاريلا الفاخرة، وزيت الزيتون البكر.",
         descriptionEn:
           "Italian simplicity: herbed tomato sauce, a generous layer of mozzarella and extra-virgin olive oil.",
-        imageUrl: "/menu/pizza-margherita.svg",
+        imageUrl: "https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?w=1000&q=80",
         basePriceMinor: 3500,
         prepMinutes: 16,
         optionGroups: [pizzaSizes(800, 1600), crustGroup, extrasGroup],
@@ -222,7 +232,7 @@ const CATALOG: CategorySeed[] = [
         descriptionAr:
           "عجينة رقيقة ومحشوة باللحم المفروم الطازج المتبل بالبصل والبهارات الشرقية المميزة.",
         descriptionEn: "Thin dough filled with fresh minced meat, onion and Levantine spices.",
-        imageUrl: "/menu/fatayer-meat.svg",
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Sfiha2.jpg/960px-Sfiha2.jpg",
         basePriceMinor: 2200,
         prepMinutes: 12,
       },
@@ -232,7 +242,7 @@ const CATALOG: CategorySeed[] = [
         nameEn: "Kraft Cheese & Honey Fatayer",
         descriptionAr: "فطيرة ساخنة ومحشوة بجبنة كرافت الأصلية الغنية ومغطاة بأجود أنواع العسل الصافي.",
         descriptionEn: "Hot pastry filled with rich Kraft cheese and finished with pure honey.",
-        imageUrl: "/menu/fatayer-kraft-honey.svg",
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/Fatayer.jpg/960px-Fatayer.jpg",
         basePriceMinor: 2000,
         featured: true,
         prepMinutes: 12,
@@ -243,7 +253,7 @@ const CATALOG: CategorySeed[] = [
         nameEn: "Labneh & Wild Za'atar",
         descriptionAr: "لبنة كريمية تركية مع خلطة الزعتر البري وزيت الزيتون على عجينة مخبوزة على الحجر.",
         descriptionEn: "Creamy labneh with wild za'atar and olive oil on stone-baked dough.",
-        imageUrl: "/menu/fatayer-zaatar.svg",
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/Zaatar_Mankousheh.jpg/960px-Zaatar_Mankousheh.jpg",
         basePriceMinor: 1800,
         prepMinutes: 12,
       },
@@ -263,7 +273,7 @@ const CATALOG: CategorySeed[] = [
         nameEn: "Fried Mozzarella Sticks",
         descriptionAr: "أصابع الموزاريلا الذهبية المقرمشة (5 قطع) تقدم مع صوص المارينارا اللذيذ للتغميس.",
         descriptionEn: "Five golden, crisp mozzarella sticks served with marinara for dipping.",
-        imageUrl: "/menu/mozzarella-sticks.svg",
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Fried_Mozzarella_Sticks_at_Millers_Pub_(301456962).jpg/960px-Fried_Mozzarella_Sticks_at_Millers_Pub_(301456962).jpg",
         basePriceMinor: 2200,
         prepMinutes: 10,
       },
@@ -274,7 +284,7 @@ const CATALOG: CategorySeed[] = [
         descriptionAr:
           "قطع خبز فرنسي مقرمش مدهونة بزبدة الثوم والأعشاب ومغطاة بجبنة الموزاريلا الساخنة الذائبة.",
         descriptionEn: "Crisp French bread with garlic-herb butter under hot melted mozzarella.",
-        imageUrl: "/menu/garlic-bread.svg",
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/59/Garlicbread.jpg/960px-Garlicbread.jpg",
         basePriceMinor: 1800,
         prepMinutes: 10,
       },
@@ -285,7 +295,7 @@ const CATALOG: CategorySeed[] = [
         descriptionAr:
           "أصابع بطاطس ودجز مقرمشة ومتبلة بخلطة البابريكا والأعشاب الإيطالية مع صوص الكاتشب أو المايونيز.",
         descriptionEn: "Crisp wedges in paprika and Italian herbs, with ketchup or mayonnaise.",
-        imageUrl: "/menu/potato-wedges.svg",
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Potato_wedges_at_Mensa_Paderborn_(11956794164).jpg/960px-Potato_wedges_at_Mensa_Paderborn_(11956794164).jpg",
         basePriceMinor: 1500,
         prepMinutes: 10,
       },
@@ -306,7 +316,7 @@ const CATALOG: CategorySeed[] = [
         descriptionAr:
           "عجينة بيتزا طازجة ومحشوة بشوكولاتة النوتيلا الغنية مع شرائح الموز والمكسرات المحمصة.",
         descriptionEn: "Fresh pizza dough filled with Nutella, banana slices and toasted nuts.",
-        imageUrl: "/menu/nutella-banana.svg",
+        imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Nutella_Pizza.jpg/960px-Nutella_Pizza.jpg",
         basePriceMinor: 2500,
         featured: true,
         prepMinutes: 12,
@@ -377,7 +387,14 @@ async function seedRestaurant() {
     addressEn:
       "Hadhramaut, Al Mukalla, Fuwah, Al Masakin district — near Al Nour clinic, Al Ahgaff University and Al Sallal school",
     city: "Al Mukalla",
-    mapUrl: "https://maps.google.com/?q=Pizza+House+66+Al+Mukalla",
+    // The restaurant's own Google Maps listing (Plus Code F2QV+MQ), not a text
+    // search: a search link resolves to whichever "Pizza House" Maps ranks
+    // first, and the restaurant has publicly said it has no other branch and
+    // no connection to anything else using the name. The coordinates are read
+    // from that listing and feed the `geo` field in the structured data.
+    mapUrl: "https://maps.app.goo.gl/46NWzDAAjEQU9bMM7",
+    latitude: 14.4891696,
+    longitude: 49.0444845,
     instagramUrl: "https://www.instagram.com/pizza_house66/",
     // The client collects transfers through Yemen's local wallets rather than
     // a bank IBAN, so the "bank" fields carry the wallet names and the number
@@ -811,8 +828,9 @@ async function main() {
   console.log(
     `[seed] Done — ${counts[0]} categories, ${counts[1]} products, ${counts[2]} promotions, ${counts[3]} staff accounts.`
   );
-  console.log("[seed] The menu, hours and contact details are the real ones.");
-  console.log("[seed] Still to confirm before launch: see docs/ASSUMPTIONS.md.");
+  console.log("[seed] Contact details, map pin and sessions are checked against the restaurant's own listings.");
+  console.log("[seed] The MENU is a 16-item stand-in; the restaurant has ~184. Closing time (23:00 vs 23:30) is unconfirmed.");
+  console.log("[seed] See docs/FIELD-RESEARCH-2026-10.md and docs/ASSUMPTIONS.md before launch.");
 }
 
 main()

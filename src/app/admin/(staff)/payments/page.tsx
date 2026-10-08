@@ -25,7 +25,7 @@ export default async function AdminPaymentsPage() {
   const t = getDictionary(locale);
   const restaurant = await getRestaurant();
 
-  const [queue, reviewed] = await Promise.all([
+  const [{ payments: queue, waiting, hidden }, reviewed] = await Promise.all([
     listPaymentsForReview(),
     listRecentlyReviewedPayments(),
   ]);
@@ -37,7 +37,7 @@ export default async function AdminPaymentsPage() {
       <SectionHeading level={1} title={t.payments.title} />
 
       <section>
-        <SectionHeading title={`${t.payments.queue} (${queue.length})`} />
+        <SectionHeading title={`${t.payments.queue} (${waiting})`} />
         {queue.length === 0 ? (
           <EmptyState title={t.payments.empty} icon={<CheckCircleIcon />} />
         ) : (
@@ -123,6 +123,11 @@ export default async function AdminPaymentsPage() {
             ))}
           </ul>
         )}
+        {hidden > 0 ? (
+          <p className="mt-4 rounded-[var(--radius-sm)] bg-surface-muted px-4 py-3 text-sm font-semibold text-ink-soft">
+            {t.payments.moreWaiting.replace("{count}", String(hidden))}
+          </p>
+        ) : null}
       </section>
 
       <section>

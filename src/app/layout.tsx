@@ -51,10 +51,19 @@ export async function generateMetadata(): Promise<Metadata> {
     description,
     applicationName: t.common.siteName,
     manifest: "/manifest.webmanifest",
-    icons: {
-      icon: [{ url: "/brand/logo.svg", type: "image/svg+xml" }],
-      apple: [{ url: "/brand/icon-maskable.svg" }],
-    },
+    // Icons come from src/app/icon.tsx and apple-icon.tsx (real PNGs; iOS
+    // ignores SVG), so none are declared here.
+    category: "food",
+    keywords: [
+      "بيتزا هاوس المكلا",
+      "Pizza House Mukalla",
+      "مطعم بيتزا فوه",
+      "حي المساكن فوه",
+      "بيتزا المكلا",
+      "طلب مسبق واستلام",
+      "pizza_house66",
+    ],
+    appleWebApp: { capable: true, title: t.common.siteName, statusBarStyle: "default" },
     openGraph: {
       type: "website",
       siteName: t.common.siteName,

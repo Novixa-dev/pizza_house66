@@ -81,9 +81,9 @@ Source of the idea: `docs/PROJECT_ORIGIN.md`. Full requirements: `docs/PRD.md`.
 | Languages | Arabic (default, RTL) and English (LTR) |
 | Currency | YER, integer minor units |
 | Timezone | `Asia/Aden` (UTC+3, no DST) — stored as data, not hardcoded |
-| Application code | ~14,600 lines across 92 TypeScript/TSX files |
-| Tests | 88 unit · 24 integration · 96 end-to-end |
-| Documentation | 24 files in `docs/`, plus this handbook |
+| Application code | ~20,600 lines across 135 TypeScript/TSX files in `src/` |
+| Tests | 259 unit · 71 integration · 190 end-to-end (95 × two projects; one skipped by design) |
+| Documentation | 31 files in `docs/`, plus this handbook |
 
 This is also the reference implementation for **Novixa Restaurant**, a
 reusable product for other restaurants — see [§13](#13-plans-and-ideas-in-priority-order).
@@ -515,7 +515,7 @@ platform-specific. Deeper: `docs/DEPLOYMENT.md`, `docs/ENVIRONMENT.md`.
 | Testing | Unit, integration and end-to-end suites |
 | SEO, analytics, PWA | Structured data, sitemap, funnel, manifest |
 | Documentation | 24 documents, rewritten from the code |
-| CI | Three-job workflow, deduplicated per commit |
+| CI | Four-job workflow (static, production build with no devDependencies, integration, end-to-end), run once per commit by the pull-request event |
 | Deployment | Live on Railway with a post-deploy smoke check and a startup wait for the database |
 | Accessibility | axe-core in CI; three real defects found and fixed |
 | Review | Screen-by-screen design and UX pass against the running app: 17 defects found and fixed, 248 tests green |
@@ -632,11 +632,11 @@ Pizza House can supply. `docs/HANDOVER.md` walks through them in order.
 
 | # | Needed | Why it blocks launch |
 |---|---|---|
-| 1 | Real menu, prices, descriptions | Everything seeded is illustrative |
-| 2 | Real business hours | Seeded as 16:00–00:00 daily |
+| 1 | Real menu, prices, descriptions | We have 16 items; the restaurant's own delivery-app listing shows ~184 (`docs/FIELD-RESEARCH-2026-10.md`). Ask the owner to export it |
+| 2 | Confirm closing time | Google says 23:00, we use 23:30 |
 | 3 | Real prep time per product | The scheduling promise is only as good as these |
 | 4 | Real slot capacity | What the kitchen can actually cook per 15 minutes |
-| 5 | Real contact details and address | Phone, WhatsApp, address, map, coordinates |
+| 5 | ~~Real contact details and address~~ | Done — checked against Google Maps and Instagram |
 | 6 | Bank transfer details | Checked character by character |
 | 7 | Food photography | Current images are illustrations |
 | 8 | Staff list and roles | So real accounts replace the demo ones |
@@ -645,12 +645,13 @@ Pizza House can supply. `docs/HANDOVER.md` walks through them in order.
 Every one is editable from the admin panel. No business logic hardcodes a
 Pizza House value.
 
-**Two environment blockers**, outside the repository:
+**One environment blocker**, outside the repository (and one that cleared):
 
-- **GitHub Actions cannot schedule a runner.** Jobs complete in ~5 seconds
-  with `runner_id: 0` and no logs — exhausted Actions minutes or Actions
-  disabled for the organization. Making the repository public resolves it,
-  since Actions is free and unmetered there.
+- ~~**GitHub Actions cannot schedule a runner.**~~ **Cleared.** For the first 55
+  runs, jobs completed in ~5 seconds with `runner_id: 0` and no logs — an
+  account-level block. It was lifted, CI runs on every pull request, and the
+  working branch is green on all four jobs. If the symptom ever returns, it is
+  that block again, not the code: `docs/DEPLOYMENT.md`.
 - **The build container's network policy denies the deployment host**, so the
   smoke check and Playwright cannot be pointed at the live URL from here.
   `app-production-656a.up.railway.app:443` and `pizza-house66.ai.studio:443`

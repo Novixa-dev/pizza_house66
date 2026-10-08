@@ -143,3 +143,155 @@ export async function summarizeOrders(tokens: string[]): Promise<OrderSummary[]>
 
   return orders.map(toSummary);
 }
+
+
+// --- Ordering the same thing again ----------------------------------------
+
+export interface ReorderOption {
+  optionValueId: string;
+  groupNameAr: string;
+  groupNameEn: string;
+  nameAr: string;
+  nameEn: string;
+  priceDeltaMinor: number;
+}
+
+export interface ReorderLine {
+  productId: string;
+  slug: string;
+  nameAr: string;
+  nameEn: string;
+  imageUrl: string | null;
+  basePriceMinor: number;
+  quantity: number;
+  /** Full option rows as they are priced *today*, ready for the cart. */
+  options: ReorderOption[];
+  note?: string;
+}
+
+export interface ReorderResult {
+  lines: ReorderLine[];
+  /** Items that could not be rebuilt, by the name they were bought under. */
+  unavailableAr: string[];
+  unavailableEn: string[];
+}
+
+/**
+ * Rebuilds a past order as a basket.
+ *
+ * A regular orders the same thing, and making them rebuild it by hand every
+ * time is the friction that sends them to whoever is easier. This is the
+ * single highest-value thing that can be added once orders are recoverable
+ * at all.
+ *
+ * The care is all in what it refuses to do. An OrderItem keeps a *snapshot*
+ * of the name and price so a receipt stays readable after the product is
+ * deleted — so a line can name a pizza that no longer exists, at a price no
+ * longer charged. Rebuilding from the snapshot would put a phantom in the
+ * basket and price it at whatever it cost in March.
+ *
+ * So a line is rebuilt only from live rows: the product must still exist, be
+ * orderable, and every option that was chosen must still exist on it. Prices
+ * come from the product as it is now, never from the order. Anything that
+ * fails those checks is named in `unavailable` rather than dropped, because a
+ * basket silently missing the thing someone came back for is worse than a
+ * basket that says what it could not bring.
+ */
+export async function buildReorder(token: string): Promise<ReorderResult | null> {
+  if (token.length < 16 || token.length > 128) return null;
+
+  const order = await prisma.order.findUnique({
+    where: { trackingToken: token },
+    select: {
+      items: {
+        select: {
+          productId: true,
+          nameAr: true,
+          nameEn: true,
+          quantity: true,
+          note: true,
+          options: { select: { optionValueId: true } },
+          product: {
+            select: {
+              id: true,
+              slug: true,
+              nameAr: true,
+              nameEn: true,
+              imageUrl: true,
+              basePriceMinor: true,
+              availability: true,
+              image: { select: { version: true } },
+              optionGroups: {
+                select: {
+                  nameAr: true,
+                  nameEn: true,
+                  values: {
+                    select: { id: true, nameAr: true, nameEn: true, priceDeltaMinor: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!order) return null;
+
+  const lines: ReorderLine[] = [];
+  const unavailableAr: string[] = [];
+  const unavailableEn: string[] = [];
+
+  for (const item of order.items) {
+    const product = item.product;
+    // SOLD_OUT is offered again deliberately: it is a state that changes by
+    // the hour, and checkout re-checks it. HIDDEN means withdrawn.
+    const orderable = product && product.availability !== "HIDDEN";
+
+    // Rebuilt from the product's groups as they stand now, so the names and
+    // the price deltas are today's rather than the receipt's.
+    const liveOptions = new Map(
+      (product?.optionGroups ?? []).flatMap((group) =>
+        group.values.map(
+          (value) =>
+            [
+              value.id,
+              {
+                optionValueId: value.id,
+                groupNameAr: group.nameAr,
+                groupNameEn: group.nameEn,
+                nameAr: value.nameAr,
+                nameEn: value.nameEn,
+                priceDeltaMinor: value.priceDeltaMinor,
+              } satisfies ReorderOption,
+            ] as const
+        )
+      )
+    );
+    const chosen = item.options.map((option) => option.optionValueId);
+    const optionsIntact = chosen.every((id) => id !== null && liveOptions.has(id));
+
+    if (!orderable || !optionsIntact) {
+      unavailableAr.push(item.nameAr);
+      unavailableEn.push(item.nameEn);
+      continue;
+    }
+
+    lines.push({
+      productId: product.id,
+      slug: product.slug,
+      nameAr: product.nameAr,
+      nameEn: product.nameEn,
+      imageUrl: product.image
+        ? `/api/product-images/${product.slug}?v=${product.image.version}`
+        : product.imageUrl,
+      // Today's price, not the one on the receipt.
+      basePriceMinor: product.basePriceMinor,
+      quantity: item.quantity,
+      options: (chosen as string[]).map((id) => liveOptions.get(id)!),
+      note: item.note ?? undefined,
+    });
+  }
+
+  return { lines, unavailableAr, unavailableEn };
+}
