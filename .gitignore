@@ -54,3 +54,9 @@ next-env.d.ts
 # Screenshots captured for review — regenerate rather than version 5MB of PNGs.
 /screenshots/
 .pgkeep.sh
+
+# VPS deployment: secrets, state and dumps stay on the server
+!deploy/.env.example
+deploy/.env
+deploy/.state/
+deploy/backups/

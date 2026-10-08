@@ -1,0 +1,104 @@
+# Pizza House on a single server: the app, its database, the HTTPS front door,
+# and the one small job that keeps scheduled orders moving.
+#
+# Run from this directory (`docker compose …`); `.env` beside this file is
+# read automatically. `install.sh` creates it and starts everything.
+#
+# Only Caddy publishes ports. Postgres and the app are reachable from each
+# other and from nothing else — a database on a public IP is how a restaurant's
+# order history ends up on the internet.
+
+name: pizzahouse
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pizza
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is not set — run install.sh}
+      POSTGRES_DB: pizzahouse
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pizza -d pizzahouse"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: https://${DOMAIN:?DOMAIN is not set — run install.sh}
+    image: pizzahouse-app:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://pizza:${DB_PASSWORD}@db:5432/pizzahouse?schema=public
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is not set — run install.sh}
+      CRON_SECRET: ${CRON_SECRET:?CRON_SECRET is not set — run install.sh}
+      NEXT_PUBLIC_APP_URL: https://${DOMAIN}
+    healthcheck:
+      # /robots.txt answers without touching the database, so this says
+      # "the server is up", not "the database is up".
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/robots.txt').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    logging: *logging
+
+  # Releases scheduled orders into the kitchen queue when their prep time
+  # arrives (docs/PRD.md §13). Vercel did this with a cron entry; here it is a
+  # loop. A missed minute costs nothing — the kitchen screen also releases due
+  # orders whenever it loads — but this keeps it true with nobody watching.
+  scheduler:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      CRON_SECRET: ${CRON_SECRET}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          curl -fsS -m 20 -o /dev/null -H "Authorization: Bearer $$CRON_SECRET" http://app:3000/api/cron/release-orders || echo "release call failed"
+          sleep 60
+        done
+    logging: *logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is not set — run install.sh}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging: *logging
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

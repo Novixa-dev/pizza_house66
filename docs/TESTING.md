@@ -5,7 +5,7 @@ Three suites, each answering a different question.
 | Suite | Question | Tests | Command |
 |---|---|---|---|
 | Unit | Are the rules correct? | 259 | `npm test` |
-| Integration | Does the database agree? | 71 | `npm run test:integration` |
+| Integration | Does the database agree? | 74 | `npm run test:integration` |
 | End-to-end | Does a person get through it? | 190 (95 × two projects) | `npm run test:e2e` |
 
 All green — 189 of the 190 end-to-end runs pass and one is skipped by design
@@ -94,7 +94,7 @@ the credits page reads its file name from.
 
 ---
 
-## Integration — `tests/integration/` (71)
+## Integration — `tests/integration/` (74)
 
 Runs against a **real PostgreSQL database**, because the properties under
 test are ones only a database can violate: uniqueness, transaction
@@ -141,6 +141,10 @@ can break the property:
 - **`photo-credits.test.ts` (3)** — every Wikimedia photograph actually on the
   menu has a credit entry, and a second test that it found something to check
   so the first cannot pass by looking at nothing.
+- **`bootstrap.test.ts` (3)** — a restart never re-runs the demo seed on a
+  populated database: an owner's edited price and a product the seed does not
+  know both survive `npm run db:bootstrap`, which the seed alone would have
+  reverted and hidden.
 - **`restaurant-identity.test.ts` (2)** — the map link is the restaurant's own
   listing, not a text search, and the coordinates fall in Al Mukalla.
 

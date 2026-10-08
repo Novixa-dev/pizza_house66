@@ -186,6 +186,15 @@ CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
 Set `output: "standalone"` in `next.config.ts` first if you want a smaller
 image; the app does not otherwise care.
 
+> **الخادم الخاص (Contabo VPS):** الطريق الموصى به الآن هو
+> [`DEPLOY-VPS.md`](DEPLOY-VPS.md) — Docker Compose وCaddy وPostgres ونسخ
+> احتياطي، بأمر تثبيت واحد. باقي هذا الملف عن Railway وVercel.
+>
+> **تحذير يخصّ أي استضافة:** لا تشغّل `npm run db:seed` عند كل إقلاع. يكتب فوق
+> أسعار المنتجات وأسماءها، ويُخفي كل منتج وقسم لا يعرفه، فتعود أسعارك القديمة
+> بعد كل إعادة تشغيل ويختفي ما استوردتَه. الأمر الصحيح للإنتاج
+> `npm run db:bootstrap` (يهيّئ قاعدة فارغة مرة واحدة فقط).
+
 ## GitHub Actions: it runs now
 
 **CI works.** Every pull request runs four jobs — typecheck/lint/unit tests, a

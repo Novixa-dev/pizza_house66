@@ -179,7 +179,8 @@ system.
 - `docs/TESTING.md` — the three suites and the gaps
 - `docs/QA-CHECKLIST.md` — the manual pass before any release
 - `docs/ENVIRONMENT.md` — every variable
-- `docs/DEPLOYMENT.md` — deploying to Vercel or anywhere else
+- `docs/DEPLOY-VPS.md` — **your own server (Contabo VPS)**: one command to install, one to update, HTTPS and nightly backups included
+- `docs/DEPLOYMENT.md` — deploying to Vercel, Railway or anywhere else
 
 **Reviews, reports and how to test it**
 - `docs/TEST-GUIDE.md` — ten ordering scenarios, step by step, with the staff

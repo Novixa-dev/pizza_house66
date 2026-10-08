@@ -1,0 +1,20 @@
+# The HTTPS front door. Caddy asks Let's Encrypt for a certificate for
+# {$DOMAIN} by itself and renews it by itself; the only requirement is that
+# the domain's A record already points at this server and ports 80 and 443 are
+# open. The app never sees plain HTTP from the internet.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Caddy replaces any X-Forwarded-For the client sent with the address it
+	# actually saw, which is what the app's rate limiter reads. Do not put
+	# another proxy in front without telling the app to trust it.
+	reverse_proxy app:3000 {
+		health_uri /robots.txt
+		health_interval 30s
+		health_timeout 10s
+	}
+}
